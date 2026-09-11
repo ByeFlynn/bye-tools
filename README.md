@@ -2,11 +2,8 @@
 
 ByeTools 是一个免登录、本地优先的开发者工具箱。当前版本按产品原型提供 44 个工具入口，并实现主题、搜索、分类、收藏、历史、IndexedDB 持久化、离线缓存和响应式工作台。
 ## 演示效果
-![浅色.png](assert%2F%C7%B3%C9%AB.png)
-
-![深色.png](assert%2F%C9%EE%C9%AB.png)
-
-![全部工具.png](assert%2F%C8%AB%B2%BF%B9%A4%BE%DF.png)
+![浅色](assert/%E6%B5%85%E8%89%B2.png)
+![深色](assert/%E6%B7%B1%E8%89%B2.png)
 ## 本地开发
 
 ```bash
