@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "ByeTools 主窗口最小权限",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

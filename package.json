@@ -1,0 +1,29 @@
+{
+  "name": "byetools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "本地优先的开发者工具箱",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:visual": "node tests/visual/capture.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@tauri-apps/cli": "^2.11.4",
+    "vite": "^7.1.5"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "js-sha3": "^0.13.0",
+    "sm-crypto": "^0.5.7"
+  }
+}

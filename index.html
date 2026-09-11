@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080b0f" />
+    <meta name="description" content="ByeTools 本地优先的开发者工具箱" />
+    <meta name="application-name" content="ByeTools" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; connect-src 'self' ipc: http://ipc.localhost ws: wss:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-src 'none'; worker-src 'self' blob:" />
+    <link rel="icon" href="./icons/byetools.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>ByeTools · 开发者工具箱</title>
+    <link rel="stylesheet" href="./styles.css?v=20260911-select" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <button class="brand" type="button" data-action="home" aria-label="返回首页">
+          <span class="brand-mark" aria-hidden="true">Bt</span>
+          <span class="brand-copy">
+            <strong>ByeTools</strong>
+            <small>开发者工具箱</small>
+          </span>
+        </button>
+
+        <div class="topbar-center">
+          <label class="global-search" for="global-search">
+            <span class="search-symbol" aria-hidden="true">⌕</span>
+            <input id="global-search" type="search" placeholder="搜索工具（如：JSON、Base64、时间戳）" autocomplete="off" />
+            <kbd>⌘K</kbd>
+          </label>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="top-action" type="button" data-action="favorites" title="查看收藏">
+            <span class="top-action-icon" aria-hidden="true">☆</span><span>收藏</span><b class="action-count" data-count="favorites">0</b>
+          </button>
+          <button class="top-action" type="button" data-action="history" title="查看历史记录">
+            <span class="top-action-icon" aria-hidden="true">◷</span><span>历史记录</span>
+          </button>
+          <span class="top-divider" aria-hidden="true"></span>
+          <button class="top-action appearance-trigger" type="button" data-action="appearance" title="打开外观设置" aria-expanded="false">
+            <span class="top-action-icon appearance-icon" aria-hidden="true">◒</span><span>外观</span>
+          </button>
+          <button class="top-action settings-trigger" type="button" data-action="settings" title="打开设置" aria-expanded="false">
+            <span class="top-action-icon settings-icon" aria-hidden="true">⚙</span><span>设置</span>
+          </button>
+          <span class="local-status" title="无需登录，数据仅保存在当前设备">
+            <span class="local-status-dot" aria-hidden="true"></span><span>本地运行</span>
+          </span>
+        </div>
+
+        <button class="mobile-menu icon-button" type="button" data-action="sidebar" title="打开导航" aria-label="打开导航">☰</button>
+      </header>
+
+      <section class="settings-popover" id="settings-popover" hidden aria-label="ByeTools 设置">
+        <div class="settings-popover-head">
+          <div>
+            <p class="settings-kicker">WORKSPACE PREFERENCES</p>
+            <h2>设置</h2>
+          </div>
+          <button class="settings-close" type="button" data-action="close-settings" aria-label="关闭设置">×</button>
+        </div>
+
+        <div class="settings-section" id="theme-settings">
+          <div class="settings-section-head">
+            <div><strong>主题模式</strong><small>选择适合当前工作环境的外观</small></div>
+            <span class="settings-current" id="theme-current-label">暗黑</span>
+          </div>
+          <div class="setting-options setting-options-three">
+            <button class="setting-option" type="button" data-action="set-theme" data-theme="dark" data-theme-choice="dark">
+              <span class="setting-option-icon theme-preview theme-preview-dark" aria-hidden="true">◐</span><span class="setting-option-copy"><b>暗黑</b><small>专注工作</small></span><span class="setting-check" aria-hidden="true">✓</span>
+            </button>
+            <button class="setting-option" type="button" data-action="set-theme" data-theme="light" data-theme-choice="light">
+              <span class="setting-option-icon theme-preview theme-preview-light" aria-hidden="true">◑</span><span class="setting-option-copy"><b>浅色</b><small>清晰明亮</small></span><span class="setting-check" aria-hidden="true">✓</span>
+            </button>
+            <button class="setting-option" type="button" data-action="set-theme" data-theme="system" data-theme-choice="system">
+              <span class="setting-option-icon theme-preview theme-preview-system" aria-hidden="true">◒</span><span class="setting-option-copy"><b>跟随系统</b><small>自动适配</small></span><span class="setting-check" aria-hidden="true">✓</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section" id="menu-settings">
+          <div class="settings-section-head">
+            <div><strong>菜单展示</strong><small>调整左侧导航的宽度和信息密度</small></div>
+            <span class="settings-current" id="menu-layout-current">标准</span>
+          </div>
+          <div class="setting-options">
+            <button class="setting-option" type="button" data-menu-layout="standard">
+              <span class="layout-preview layout-preview-standard" aria-hidden="true"><i></i><i></i><i></i></span><span class="setting-option-copy"><b>标准菜单</b><small>图标、文字和分类</small></span><span class="setting-check" aria-hidden="true">✓</span>
+            </button>
+            <button class="setting-option" type="button" data-menu-layout="compact">
+              <span class="layout-preview layout-preview-compact" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="setting-option-copy"><b>紧凑菜单</b><small>缩窄导航，保留文字</small></span><span class="setting-check" aria-hidden="true">✓</span>
+            </button>
+            <button class="setting-option" type="button" data-menu-layout="icon">
+              <span class="layout-preview layout-preview-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="setting-option-copy"><b>图标菜单</b><small>仅显示图标，扩大工作区</small></span><span class="setting-check" aria-hidden="true">✓</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section settings-section-last">
+          <div class="settings-section-head">
+            <div><strong>内容密度</strong><small>控制工具卡片的展示间距</small></div>
+            <span class="settings-current" id="density-current-label">舒适</span>
+          </div>
+          <div class="setting-options setting-options-inline">
+            <button class="setting-option" type="button" data-density="comfortable"><span class="setting-option-icon density-icon">☷</span><span class="setting-option-copy"><b>舒适</b><small>更易浏览</small></span><span class="setting-check" aria-hidden="true">✓</span></button>
+            <button class="setting-option" type="button" data-density="compact"><span class="setting-option-icon density-icon">☰</span><span class="setting-option-copy"><b>紧凑</b><small>一屏更多</small></span><span class="setting-check" aria-hidden="true">✓</span></button>
+          </div>
+        </div>
+
+        <p class="settings-note"><span aria-hidden="true">●</span> ByeTools 无需账号登录，偏好和工具记录仅保存在当前设备。</p>
+      </section>
+
+      <div class="app-body">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-scroll">
+            <nav class="primary-nav" aria-label="主导航">
+              <button class="nav-item active" type="button" data-view="home"><span class="nav-icon">⌂</span><span>首页</span></button>
+              <button class="nav-item" type="button" data-view="all"><span class="nav-icon">▦</span><span>所有工具</span><span class="nav-badge" data-count="tools">0</span></button>
+              <button class="nav-item" type="button" data-view="common"><span class="nav-icon">♛</span><span>常用工具</span></button>
+              <button class="nav-item" type="button" data-view="favorites"><span class="nav-icon">★</span><span>我的收藏</span><b class="nav-count" data-count="favorites">0</b></button>
+              <button class="nav-item" type="button" data-view="history"><span class="nav-icon">◷</span><span>历史记录</span></button>
+            </nav>
+
+            <div class="sidebar-heading">工具分类</div>
+            <nav class="category-nav" aria-label="工具分类">
+              <button class="nav-item category-item" type="button" data-category="data-format"><span class="nav-icon">◌</span><span>JSON 工具</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="encoding"><span class="nav-icon">◈</span><span>编码转换</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="crypto"><span class="nav-icon">▣</span><span>加密解密</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="network"><span class="nav-icon">⌁</span><span>网络工具</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="format"><span class="nav-icon">✣</span><span>格式化工具</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="helper"><span class="nav-icon">♧</span><span>开发辅助</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="text"><span class="nav-icon">▤</span><span>文本工具</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="design"><span class="nav-icon">✦</span><span>设计工具</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="generator"><span class="nav-icon">✣</span><span>生成器</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="other"><span class="nav-icon">◫</span><span>其他工具</span><span class="nav-chevron">›</span></button>
+            </nav>
+          </div>
+          <div class="sidebar-footer">
+            <button class="nav-item" type="button" data-action="settings" title="打开设置"><span class="nav-icon">⚙</span><span>设置</span></button>
+            <span class="version-label">ByeTools Web · V0.1</span>
+          </div>
+        </aside>
+
+        <main class="main-content" id="main-content">
+          <section class="home-view" id="home-view">
+            <div class="welcome-banner">
+              <div class="welcome-copy">
+                <p class="eyebrow">LOCAL FIRST · DEVELOPER WORKBENCH</p>
+                <h1><span class="wave">👋</span> 欢迎使用 ByeTools</h1>
+                <p>高效、便捷的开发者工具箱，助你提升开发效率</p>
+              </div>
+              <div class="toolbox-art" aria-hidden="true">
+                <div class="float-card card-one">{ }</div>
+                <div class="float-card card-two">⌁</div>
+                <div class="toolbox-lid"></div>
+                <div class="toolbox-body"><span>BYE</span><span>TOOLS</span></div>
+                <div class="toolbox-tools"><i>⌘</i><i>⚡</i><i>▤</i><i>◒</i></div>
+              </div>
+            </div>
+
+            <section class="section-block common-section">
+              <div class="section-heading">
+                <div>
+                  <h2>常用工具</h2>
+                  <p>最近高频使用的开发小工具</p>
+                </div>
+                <button class="text-button" type="button" data-view="common">查看全部 <span aria-hidden="true">→</span></button>
+              </div>
+              <div class="featured-grid" id="featured-grid"></div>
+            </section>
+
+            <section class="section-block tools-section">
+              <div class="section-heading tools-heading">
+                <div>
+                  <h2>所有工具</h2>
+                  <p id="result-summary">44 个工具，覆盖开发日常任务</p>
+                </div>
+                <button class="filter-button" type="button" data-action="filter" aria-expanded="false"><span aria-hidden="true">⌘</span> 更多筛选</button>
+              </div>
+              <div class="filter-panel" id="filter-panel" hidden>
+                <label>运行环境<select id="environment-filter"><option value="all">全部</option><option value="local">本地优先</option><option value="desktop">桌面增强</option></select></label>
+                <label>排序方式<select id="sort-filter"><option value="default">推荐排序</option><option value="name">按名称</option><option value="category">按分类</option></select></label>
+                <button class="clear-filter" type="button" data-action="clear-filter">重置筛选</button>
+              </div>
+              <div class="filter-tabs" id="filter-tabs" role="tablist" aria-label="工具筛选">
+                <button class="filter-tab active" type="button" data-filter="all">全部</button>
+                <button class="filter-tab" type="button" data-filter="recent">最近使用</button>
+                <button class="filter-tab" type="button" data-filter="data-format">JSON 工具</button>
+                <button class="filter-tab" type="button" data-filter="encoding">编码转换</button>
+                <button class="filter-tab" type="button" data-filter="crypto">加密解密</button>
+                <button class="filter-tab" type="button" data-filter="network">网络工具</button>
+                <button class="filter-tab" type="button" data-filter="helper">开发辅助</button>
+                <button class="filter-tab" type="button" data-filter="text">文本工具</button>
+                <button class="filter-tab" type="button" data-filter="design">设计工具</button>
+                <button class="filter-tab" type="button" data-filter="generator">生成器</button>
+              </div>
+              <div class="tool-grid" id="tool-grid"></div>
+              <div class="empty-state" id="empty-state" hidden>
+                <span class="empty-symbol">⌕</span>
+                <strong>没有找到匹配的工具</strong>
+                <p>换一个关键词，或重置筛选条件</p>
+                <button class="primary-button compact" type="button" data-action="clear-filter">重置筛选</button>
+              </div>
+            </section>
+          </section>
+
+          <section class="tool-workspace" id="tool-workspace" hidden>
+            <div class="workspace-topline">
+              <button class="back-button" type="button" data-action="home">← 返回工具箱</button>
+              <span class="workspace-path">工具 / <b id="workspace-category">开发辅助</b></span>
+            </div>
+            <div class="workspace-header">
+              <div class="workspace-icon" id="workspace-icon">{ }</div>
+              <div>
+                <p class="eyebrow" id="workspace-label">DATA FORMAT</p>
+                <h1 id="workspace-title">JSON 格式化</h1>
+                <p id="workspace-description">格式化、压缩和校验 JSON 数据</p>
+              </div>
+              <button class="favorite-toggle workspace-favorite" type="button" data-action="workspace-favorite" title="收藏工具">☆</button>
+            </div>
+            <div class="workspace-content" id="workspace-content"></div>
+          </section>
+          <section class="utility-view" id="utility-view" hidden>
+            <div class="utility-header"><button class="back-button" type="button" data-action="home">← 返回首页</button><p class="eyebrow">PERSONAL SPACE</p><h1 id="utility-title">我的收藏</h1><p id="utility-description">快速进入你标记的工具</p></div>
+            <div class="utility-list" id="utility-list"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="command-palette" id="command-palette" hidden>
+      <div class="palette-backdrop" data-action="close-palette"></div>
+      <div class="palette-dialog" role="dialog" aria-modal="true" aria-label="搜索工具">
+        <label class="palette-search"><span aria-hidden="true">⌕</span><input id="palette-input" type="search" placeholder="输入工具名称或关键词…" autocomplete="off" /><kbd>Esc</kbd></label>
+        <div class="palette-results" id="palette-results"></div>
+        <div class="palette-hint"><span>↑↓ 选择</span><span>Enter 打开</span><span>Esc 关闭</span></div>
+      </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
+

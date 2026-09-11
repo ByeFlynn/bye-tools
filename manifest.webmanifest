@@ -1,0 +1,19 @@
+{
+  "name": "ByeTools 开发者工具箱",
+  "short_name": "ByeTools",
+  "description": "本地优先的开发者工具箱",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080a0d",
+  "theme_color": "#7552ff",
+  "icons": [
+    {
+      "src": "./icons/byetools.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
