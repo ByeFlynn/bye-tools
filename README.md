@@ -1,6 +1,6 @@
 # ByeTools
 
-ByeTools 是一个免登录、本地优先的开发者工具箱。当前版本按产品原型提供 49 个工具入口，并实现主题、搜索、分类、收藏、历史、IndexedDB 持久化、离线缓存和响应式工作台。
+ByeTools 是一个免登录、本地优先的开发者工具箱。当前版本按产品原型提供 50 个工具入口，并实现主题、搜索、分类、收藏、历史、IndexedDB 持久化、离线缓存和响应式工作台。
 ## 演示效果
 ![浅色](assert/%E6%B5%85%E8%89%B2.png)
 ![深色](assert/%E6%B7%B1%E8%89%B2.png)
@@ -24,7 +24,11 @@ npm run dev
 
 ## Markdown 编辑器
 
-Markdown 编辑器支持 Markdown 工具栏、行号、实时预览、标题/列表/引用/代码/链接等常用语法。点击“打开文件”可以读取当前设备上的 `.md`、`.markdown` 或 `.txt` 文件继续编辑；文件名会自动带上 Markdown 扩展名。点击“保存”或使用 `Ctrl+S` / `⌘S` 会将当前内容下载为 Markdown 文件，编辑草稿会同步保存在本地存储中。
+Markdown 编辑器支持编辑、源码、分栏和预览四种视图，可在同一份内容上切换所见即所得编辑、源码编辑、源码与预览并排以及纯预览。工具栏包含标题级别、粗体、斜体、删除线、行内代码、无序列表、有序列表、任务列表、引用、链接、图片、表格、代码块、公式和分隔线。点击“打开文件”可以读取当前设备上的 `.md`、`.markdown` 或 `.txt` 文件继续编辑；文件名会自动带上 Markdown 扩展名。点击“保存”或使用 `Ctrl+S` / `⌘S` 会将当前内容下载为 Markdown 文件，编辑草稿会同步保存在本地存储中。
+
+## 思维导图生成
+
+思维导图工具使用 Markdown 标题和列表描述节点层级，输入变化后会实时生成可缩放、可拖动的 SVG 思维导图。内置基础示例、读书笔记、技术架构、产品规划、学习路线、会议纪要和 OKR 拆解七种模板，支持复制大纲、插入链接、清空、自适应视图以及 SVG、PNG 下载；透明底选项可用于导出无背景图形。所有解析和导出均在当前设备完成。
 
 如果需要根据 `package.json` 更新依赖，可以使用 `npm install`。首次运行 Playwright 且本机没有浏览器组件时，可执行 `npx playwright install`。
 
@@ -50,7 +54,7 @@ Windows 构建 SQLCipher 的 vendored OpenSSL 需要 Perl、Visual Studio C++ Bu
 
 桌面端加密配置命令固定为 `crypto_config_list`、`crypto_config_save`、`crypto_config_apply`、`crypto_config_update`、`crypto_config_delete`、`crypto_config_migrate` 和 `crypto_config_rotate_key`。配置列表只返回掩码摘要，完整正文仅在应用或编辑操作中按需解密。
 
-SHA-3 已通过 `js-sha3` 在本地执行，支持 SHA3-256、SHA3-384 和 SHA3-512。SM2、SM3、SM4 已通过 `sm-crypto` 在本地执行：SM2 支持 C1C3C2 加解密，SM3 支持摘要输出，SM4 支持 ECB/CBC 及 PKCS#7、NoPadding。SM4 的 CTR、CFB、OFB 仍会明确显示暂不支持，不会生成伪造结果。AES、SHA-2 及其他纯浏览器工具同样在本地执行，工具输入不会上传服务器。
+SHA-3 已通过 `js-sha3` 在本地执行，支持 SHA3-256、SHA3-384 和 SHA3-512。SM2、SM3、SM4 已通过 `sm-crypto` 在本地执行：SM2 支持 Hex 公钥/私钥生成、私钥推导公钥、C1C3C2/C1C2C3 加解密、04 前缀和 ASN.1 DER 兼容选项，SM3 支持摘要输出，SM4 支持 ECB/CBC 及 PKCS#7、NoPadding。SM4 的 CTR、CFB、OFB 仍会明确显示暂不支持，不会生成伪造结果。AES、SHA-2 及其他纯浏览器工具同样在本地执行，工具输入不会上传服务器。
 
 ## 项目结构
 

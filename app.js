@@ -37,6 +37,7 @@ const tools = [
   { id: 'mermaid', name: 'Mermaid 图表', description: 'Mermaid 代码生成 SVG 图表', category: 'format', label: '格式化工具', icon: '◇', iconClass: 'icon-mermaid', environment: 'local', keywords: 'mermaid 图表 流程图 svg' },
   { id: 'markdown-image', name: 'Markdown 转图片', description: '主题排版与 PNG 导出', category: 'format', label: '格式化工具', icon: 'M↓', iconClass: 'icon-html', environment: 'local', keywords: 'markdown 图片 png 主题' },
   { id: 'markdown-editor', name: 'Markdown 编辑器', description: '编辑、预览并保存 Markdown 文档', category: 'format', label: '格式化工具', icon: 'MD', iconClass: 'icon-markdown-editor', environment: 'local', capability: 'ready', capabilityLabel: '本地编辑', keywords: 'markdown 编辑器 编辑 预览 文档 md 打开 保存 文件' },
+  { id: 'mindmap', name: '思维导图生成', description: '将 Markdown 大纲转换为可下载的思维导图', category: 'format', label: '格式化工具', icon: 'MM', iconClass: 'icon-mindmap', environment: 'local', capability: 'ready', capabilityLabel: '本地生成', keywords: '思维导图 mindmap markdown 大纲 结构图 svg png 模板' },
   { id: 'image-tools', name: '图片工具', description: '压缩、缩放、裁剪、格式转换和 Base64 互转', category: 'file', label: '文件工具', icon: 'IMG', iconClass: 'icon-image-tools', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: '图片 压缩 尺寸 缩放 裁剪 格式 png jpg jpeg webp avif base64' },
   { id: 'favicon', name: 'Favicon 生成器', description: '从一张图片生成网站图标和常用尺寸 PNG', category: 'file', label: '文件工具', icon: '★', iconClass: 'icon-favicon', environment: 'local', capability: 'ready', capabilityLabel: '本地生成', keywords: 'favicon 网站图标 ico png apple touch icon manifest' },
   { id: 'pdf-tools', name: 'PDF 工具', description: '合并、拆分、加水印、整理和转图片', category: 'file', label: '文件工具', icon: 'PDF', iconClass: 'icon-pdf-tools', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: 'pdf 合并 拆分 水印 整理 页面重排 转图片 png' },
@@ -137,7 +138,7 @@ const CONFIG_SECRET_KEY = 'byetools-crypto-config-secret-v1';
 const CONFIG_CRYPTO_VERSION = 1;
 let pendingCryptoConfigEditId = '';
 const configTextFieldIds = new Set([
-  'crypto-key', 'crypto-iv', 'regex-pattern', 'color-input', 'palette-base',
+  'crypto-key', 'crypto-private-key', 'crypto-iv', 'regex-pattern', 'color-input', 'palette-base',
   'password-custom-symbols', 'string-custom-symbols', 'replace-search',
   'replace-with', 'line-filter-regex', 'cron-expression',
 ]);
@@ -242,6 +243,7 @@ const workspaceTemplates = {
   mermaid: mermaidWorkbenchMarkup,
   'markdown-image': markdownImageWorkbenchMarkup,
   'markdown-editor': markdownEditorWorkbenchMarkup,
+  mindmap: mindmapWorkbenchMarkup,
   'image-tools': imageToolsWorkbenchMarkup,
   'qr-barcode': qrBarcodeWorkbenchMarkup,
   favicon: faviconWorkbenchMarkup,
@@ -1141,10 +1143,10 @@ function markdownEditorWorkbenchMarkup() {
   return `<div class="special-workbench markdown-editor-workbench">
     <div class="markdown-editor-toolbar">
       <div class="markdown-editor-file-actions"><input class="file-native-input" id="markdown-editor-file-input" type="file" accept=".md,.markdown,.mdown,.mkdn,.txt,text/markdown,text/plain" /><label class="markdown-editor-open" for="markdown-editor-file-input" title="打开本地 Markdown 文件"><span aria-hidden="true">↥</span>打开文件</label><label class="markdown-editor-filename"><span>文件名</span><input id="markdown-editor-filename" type="text" value="untitled.md" spellcheck="false" /></label></div>
-      <div class="markdown-editor-view-switch" role="tablist" aria-label="编辑器视图"><button class="markdown-editor-view is-active" type="button" role="tab" aria-selected="true" data-markdown-editor-view="edit"><span aria-hidden="true">T</span>编辑</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="source"><span aria-hidden="true">&lt;/&gt;</span>源码</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="split"><span aria-hidden="true">▣</span>分栏</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="preview"><span aria-hidden="true">◉</span>预览</button></div>
+      <div class="markdown-editor-view-switch" role="tablist" aria-label="编辑器视图"><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="edit"><span aria-hidden="true">T</span>编辑</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="source"><span aria-hidden="true">&lt;/&gt;</span>源码</button><button class="markdown-editor-view is-active" type="button" role="tab" aria-selected="true" data-markdown-editor-view="split"><span aria-hidden="true">▣</span>分栏</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="preview"><span aria-hidden="true">◉</span>预览</button></div>
       <div class="markdown-editor-actions"><button class="secondary-button" type="button" data-markdown-editor-action="new" title="新建文档">＋ 新建</button><button class="secondary-button" type="button" data-markdown-editor-action="copy-markdown" title="复制 Markdown 源码">▣ 复制</button><button class="secondary-button" type="button" data-markdown-editor-action="fullscreen" title="进入全屏">↗ 全屏</button><button class="primary-button" type="button" data-markdown-editor-action="save" title="保存 Markdown 文件">↓ 保存</button><span class="markdown-editor-status" id="markdown-editor-status">本地草稿</span></div>
     </div>
-    <div class="markdown-editor-formatbar" role="toolbar" aria-label="Markdown 格式工具栏"><label class="markdown-editor-heading-select"><span class="sr-only">标题级别</span><select id="markdown-editor-heading" aria-label="标题级别"><option value="1">Heading 1</option><option value="2">Heading 2</option><option value="3" selected>Heading 3</option><option value="4">Heading 4</option><option value="5">Heading 5</option><option value="6">Heading 6</option></select></label><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="bold" title="粗体"><b>B</b></button><button type="button" data-markdown-editor-format="italic" title="斜体"><i>I</i></button><button type="button" data-markdown-editor-format="strike" title="删除线"><s>S</s></button><button type="button" data-markdown-editor-format="code" title="行内代码">&lt;/&gt;</button><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="unordered" title="无序列表">•</button><button type="button" data-markdown-editor-format="ordered" title="有序列表">1.</button><button type="button" data-markdown-editor-format="task" title="任务列表">☑</button><button type="button" data-markdown-editor-format="quote" title="引用">❯</button><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="link" title="链接">↗</button><button type="button" data-markdown-editor-format="image" title="图片">▧</button><button type="button" data-markdown-editor-format="table" title="表格">▦</button><button type="button" data-markdown-editor-format="code-block" title="代码块">[ ]</button><button type="button" data-markdown-editor-format="math" title="公式">Σ</button><button type="button" data-markdown-editor-format="hr" title="分隔线">—</button><span class="markdown-editor-toolbar-hint">Markdown · 本地编辑</span></div>
+    <div class="markdown-editor-formatbar" role="toolbar" aria-label="Markdown 格式工具栏"><label class="markdown-editor-heading-select"><span class="sr-only">标题级别</span><select id="markdown-editor-heading" aria-label="标题级别"><option value="1" selected>Heading 1</option><option value="2">Heading 2</option><option value="3">Heading 3</option><option value="4">Heading 4</option><option value="5">Heading 5</option><option value="6">Heading 6</option></select></label><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="bold" title="粗体"><b>B</b></button><button type="button" data-markdown-editor-format="italic" title="斜体"><i>I</i></button><button type="button" data-markdown-editor-format="strike" title="删除线"><s>S</s></button><button type="button" data-markdown-editor-format="code" title="行内代码">&lt;/&gt;</button><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="unordered" title="无序列表">•</button><button type="button" data-markdown-editor-format="ordered" title="有序列表">1.</button><button type="button" data-markdown-editor-format="task" title="任务列表">☑</button><button type="button" data-markdown-editor-format="quote" title="引用">❯</button><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="link" title="链接">↗</button><button type="button" data-markdown-editor-format="image" title="图片">▧</button><button type="button" data-markdown-editor-format="table" title="表格">▦</button><button type="button" data-markdown-editor-format="code-block" title="代码块">[ ]</button><button type="button" data-markdown-editor-format="math" title="公式">Σ</button><button type="button" data-markdown-editor-format="hr" title="分隔线">—</button><span class="markdown-editor-toolbar-hint">Markdown · 本地编辑</span></div>
     <div class="markdown-editor-layout" data-markdown-editor-layout data-markdown-view="split"><section class="workspace-card markdown-editor-input-card" data-markdown-editor-pane="source"><div class="workspace-card-head"><div><strong>源码编辑</strong><small>标准 Markdown 源码，输入时实时同步预览</small></div><span class="code-badge">MD</span></div><div class="markdown-editor-edit-shell"><div class="markdown-editor-line-numbers" id="markdown-editor-line-numbers" aria-hidden="true">1</div><textarea id="markdown-editor-input" spellcheck="false" wrap="off" aria-label="Markdown 编辑区"># ByeTools Markdown\n\n在这里编辑 Markdown 文档，右侧会实时显示预览。\n\n## 常用语法\n\n- 支持标题、列表和引用\n- 支持 **粗体**、*斜体* 和 \`行内代码\`\n\n> 所有内容只在当前设备处理。</textarea></div><div class="workspace-card-foot"><span id="markdown-editor-count">0 字符 · 0 行</span><button class="text-button" type="button" data-markdown-editor-action="clear">清空</button></div></section><section class="workspace-card markdown-editor-visual-card" data-markdown-editor-pane="visual"><div class="workspace-card-head"><div><strong>编辑</strong><small>所见即所得编辑，格式会同步为 Markdown</small></div><span class="code-badge">EDIT</span></div><div class="markdown-editor-visual" id="markdown-editor-visual" contenteditable="true" role="textbox" aria-label="Markdown 可视化编辑区" spellcheck="false"></div><div class="workspace-card-foot"><span>可视化编辑</span><span>自动同步源码</span></div></section><section class="workspace-card markdown-editor-preview-card" data-markdown-editor-pane="preview"><div class="workspace-card-head"><div><strong>实时预览</strong><small>渲染后的 Markdown 文档</small></div><div class="markdown-preview-actions"><span class="code-badge">PREVIEW</span><button class="text-button" type="button" data-markdown-editor-action="copy-html">复制 HTML</button></div></div><div class="markdown-editor-preview" id="markdown-editor-preview"></div><div class="workspace-card-foot"><span>本地渲染</span><span id="markdown-editor-preview-meta">实时更新</span></div></section></div>
   </div>`;
 }
@@ -2081,6 +2083,257 @@ function bindHtmlWorkspace() {
   execute('html-encode');
 }
 
+const mindmapTemplatePresets = {
+  basic: {
+    label: '基础示例',
+    content: '# 365 工具箱\n\n## 文本工具\n- JSON 解析\n- 正则测试\n- 字数统计\n- 文本去重\n\n## 图像工具\n- 图片压缩\n- 格式转换\n- EXIF 清理\n\n## 开发工具\n- 时间戳\n- Base64\n- JWT 解析\n- 思维导图',
+  },
+  reading: {
+    label: '读书笔记',
+    content: '# 读书笔记\n\n## 核心观点\n- 先建立整体框架\n- 用问题驱动阅读\n- 通过实践检验理解\n\n## 金句摘录\n- 知行合一，持续复盘\n- 把复杂问题拆成小步骤\n\n## 行动计划\n- 每周整理一次笔记\n- 将观点应用到工作中',
+  },
+  architecture: {
+    label: '技术架构',
+    content: '# 应用系统\n\n## 前端\n- Vue / React\n- 状态管理\n- 组件库\n\n## 服务端\n- API 网关\n- 业务服务\n- 消息队列\n\n## 数据层\n- PostgreSQL\n- Redis\n- 对象存储',
+  },
+  product: {
+    label: '产品规划',
+    content: '# 产品规划\n\n## 用户问题\n- 信息分散\n- 上手成本高\n\n## 解决方案\n- 统一工作台\n- 模板化流程\n- 数据本地处理\n\n## 版本节奏\n- MVP 验证\n- 体验优化\n- 团队协作',
+  },
+  learning: {
+    label: '学习路线',
+    content: '# 前端学习路线\n\n## 基础\n- HTML / CSS\n- JavaScript\n- Git\n\n## 进阶\n- TypeScript\n- 工程化\n- 性能优化\n\n## 实战\n- 独立项目\n- 自动化测试\n- 部署上线',
+  },
+  meeting: {
+    label: '会议纪要',
+    content: '# 周会纪要\n\n## 本周进展\n- 完成核心页面\n- 修复交互问题\n\n## 讨论事项\n- 下阶段排期\n- 发布检查清单\n\n## 待办事项\n- @产品：确认需求\n- @研发：补充测试\n- @设计：更新资源',
+  },
+  okr: {
+    label: 'OKR 拆解',
+    content: '# Q4 目标\n\n## O1 提升产品质量\n- KR1：核心流程成功率达到 99%\n- KR2：线上故障减少 30%\n\n## O2 扩大用户覆盖\n- KR1：新增 10 个重点客户\n- KR2：月活用户达到 5 万\n\n## O3 提高团队效率\n- KR1：自动化测试覆盖率达到 80%\n- KR2：交付周期缩短 20%',
+  },
+};
+
+function mindmapWorkbenchMarkup() {
+  const templateButtons = Object.entries(mindmapTemplatePresets).map(([id, preset], index) => `<button class="mindmap-template-button ${index === 0 ? 'is-active' : ''}" type="button" data-mindmap-template="${id}" aria-selected="${index === 0 ? 'true' : 'false'}">${preset.label}</button>`).join('');
+  return `<div class="special-workbench mindmap-workbench">
+    <div class="mindmap-template-bar" role="tablist" aria-label="思维导图模板"><span class="mindmap-template-label">模板：</span>${templateButtons}</div>
+    <div class="mindmap-layout">
+      <section class="workspace-card mindmap-editor-card">
+        <div class="workspace-card-head"><div><strong>Markdown 大纲</strong><small>使用标题和列表组织节点层级</small></div><div class="mindmap-editor-actions"><button class="secondary-button" type="button" data-mindmap-action="copy" title="复制 Markdown"><span aria-hidden="true">▣</span> MD</button><button class="secondary-button" type="button" data-mindmap-action="link" title="插入链接"><span aria-hidden="true">↗</span> 链接</button><button class="secondary-button" type="button" data-mindmap-action="clear">清空</button></div></div>
+        <textarea id="mindmap-input" spellcheck="false" aria-label="Markdown 大纲编辑区">${mindmapTemplatePresets.basic.content}</textarea>
+        <div class="workspace-card-foot"><span id="mindmap-input-meta">实时解析 · Markdown</span><span>本地处理</span></div>
+      </section>
+      <section class="workspace-card mindmap-preview-card">
+        <div class="workspace-card-head"><div><strong>思维导图</strong><small>根据大纲自动布局，可拖动和滚轮缩放</small></div><div class="mindmap-preview-actions"><button class="secondary-button" type="button" data-mindmap-action="fit"><span aria-hidden="true">⊡</span> 自适应</button><button class="secondary-button" type="button" data-mindmap-action="download-svg"><span aria-hidden="true">↓</span> SVG</button><button class="secondary-button" type="button" data-mindmap-action="download-png"><span aria-hidden="true">↓</span> PNG</button><label class="mindmap-transparent-toggle"><input id="mindmap-transparent" type="checkbox" /><span>透明底</span></label></div></div>
+        <div class="mindmap-preview" id="mindmap-preview" tabindex="0" aria-label="思维导图预览"></div>
+        <div class="workspace-card-foot"><span id="mindmap-status">准备就绪</span><span>SVG · PNG</span></div>
+      </section>
+    </div>
+  </div>`;
+}
+
+function parseMindmapMarkdown(source) {
+  const lines = String(source || '').replace(/\r\n?/g, '\n').split('\n');
+  const nodes = [];
+  let currentHeadingLevel = 0;
+  lines.forEach((line, lineIndex) => {
+    if (!line.trim()) return;
+    const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*$/);
+    const list = line.match(/^(\s*)(?:[-*+]\s+|\d+[.)]\s+)(.+?)\s*$/);
+    const plain = !heading && !list ? line.match(/^\s*(.+?)\s*$/) : null;
+    if (!heading && !list && !plain) return;
+    let level;
+    let label;
+    let kind;
+    if (heading) {
+      level = heading[1].length;
+      label = heading[2];
+      kind = 'heading';
+      currentHeadingLevel = level;
+    } else if (list) {
+      const indent = Math.floor(list[1].replace(/\t/g, '  ').length / 2);
+      level = Math.max(2, (currentHeadingLevel || 1) + 1 + indent);
+      label = list[2];
+      kind = 'list';
+    } else {
+      level = currentHeadingLevel ? currentHeadingLevel + 1 : 1;
+      label = plain[1];
+      kind = 'text';
+    }
+    label = label.replace(/^\[([ xX])\]\s+/, '').trim();
+    if (label) nodes.push({ id: `mindmap-node-${lineIndex}`, label, level, kind });
+  });
+  if (!nodes.length) return { root: { id: 'mindmap-root', label: '思维导图', level: 1, kind: 'root', children: [] }, count: 1 };
+  const firstLevel = Math.min(...nodes.map((node) => node.level));
+  nodes.forEach((node) => { node.level = Math.max(1, node.level - firstLevel + 1); node.children = []; });
+  let root = nodes[0];
+  if (root.level !== 1) { root = { id: 'mindmap-root', label: '思维导图', level: 1, kind: 'root', children: [] }; }
+  const stack = root.id === 'mindmap-root' ? [root] : [root];
+  if (root.id !== 'mindmap-root') root.children = [];
+  nodes.forEach((node, index) => {
+    if (node === root) return;
+    while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop();
+    const parent = stack[stack.length - 1] || root;
+    parent.children.push(node);
+    stack.push(node);
+    if (index === 0 && root.id === 'mindmap-root') stack.splice(0, stack.length, root, node);
+  });
+  if (root.id === 'mindmap-root' && !root.children.length) root.children = nodes;
+  const count = nodes.length + (root.id === 'mindmap-root' ? 1 : 0);
+  return { root, count };
+}
+
+function renderMindmapSvg(source, options = {}) {
+  const graph = parseMindmapMarkdown(source);
+  const root = graph.root;
+  const leaves = [];
+  const visitLeaves = (node) => { if (!node.children.length) leaves.push(node); else node.children.forEach(visitLeaves); };
+  visitLeaves(root);
+  const leafGap = 58;
+  const levelGap = 218;
+  const top = 58;
+  const left = 92;
+  const right = 54;
+  const height = Math.max(360, top * 2 + Math.max(1, leaves.length - 1) * leafGap + 70);
+  const depthMap = new Map();
+  const positions = new Map();
+  const labelWidth = (label) => Math.min(260, Math.max(72, [...label].length * 14 + 28));
+  let leafIndex = 0;
+  const place = (node, depth) => {
+    depthMap.set(node, Math.max(depthMap.get(node) || 0, depth));
+    const x = left + depth * levelGap;
+    if (!node.children.length) {
+      const y = top + leafIndex * leafGap + 26;
+      leafIndex += 1;
+      positions.set(node, { x, y, width: labelWidth(node.label), depth });
+      return y;
+    }
+    const childYs = node.children.map((child) => place(child, depth + 1));
+    const y = (childYs[0] + childYs[childYs.length - 1]) / 2;
+    positions.set(node, { x, y, width: labelWidth(node.label), depth });
+    return y;
+  };
+  place(root, 0);
+  const maxDepth = Math.max(...[...positions.values()].map((item) => item.depth), 0);
+  const width = Math.max(760, left + (maxDepth + 1) * levelGap + right);
+  const background = options.transparent ? '' : `<rect width="100%" height="100%" fill="${options.background || '#ffffff'}" />`;
+  const palette = ['#3182ce', '#f97316', '#16a34a', '#e11d48', '#8b5cf6', '#0891b2', '#ca8a04'];
+  const textColor = options.textColor || '#273248';
+  const lines = [];
+  const nodes = [];
+  const add = (node, branchColor) => {
+    const from = positions.get(node);
+    node.children.forEach((child, childIndex) => {
+      const to = positions.get(child);
+      const color = node === root ? palette[childIndex % palette.length] : branchColor;
+      const startX = from.x + from.width * 0.45;
+      const endX = to.x - to.width * 0.48;
+      const bend = Math.max(34, (endX - startX) * 0.42);
+      lines.push(`<path d="M ${startX.toFixed(1)} ${from.y.toFixed(1)} C ${(startX + bend).toFixed(1)} ${from.y.toFixed(1)}, ${(endX - bend).toFixed(1)} ${to.y.toFixed(1)}, ${endX.toFixed(1)} ${to.y.toFixed(1)}" fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" />`);
+      add(child, color);
+    });
+    const point = positions.get(node);
+    const fontSize = node === root ? 22 : node.kind === 'heading' ? 17 : 15;
+    const weight = node === root || node.kind === 'heading' ? 600 : 450;
+    const color = node === root ? textColor : branchColor || textColor;
+    const underline = node === root ? '' : `<line x1="${(point.x - point.width * 0.46).toFixed(1)}" y1="${(point.y + 9).toFixed(1)}" x2="${(point.x + point.width * 0.46).toFixed(1)}" y2="${(point.y + 9).toFixed(1)}" stroke="${color}" stroke-width="2" opacity=".86" />`;
+    const circle = node.children.length ? `<circle cx="${(point.x + point.width * 0.46).toFixed(1)}" cy="${point.y.toFixed(1)}" r="${node === root ? 8 : 6}" fill="#fff" stroke="${color}" stroke-width="2.6" />` : '';
+    nodes.push(`${underline}${circle}<text x="${point.x.toFixed(1)}" y="${(point.y + (node === root ? 7 : 5)).toFixed(1)}" text-anchor="middle" fill="${color}" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif" font-size="${fontSize}" font-weight="${weight}">${escapeHtml(node.label)}</text>`);
+  };
+  add(root, palette[0]);
+  return { graph, svg: `<svg xmlns="http://www.w3.org/2000/svg" class="mindmap-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="思维导图"><title>${escapeHtml(root.label)}</title>${background}${lines.join('')}${nodes.join('')}</svg>` };
+}
+
+function bindMindmapWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const input = content.querySelector('#mindmap-input');
+  const preview = content.querySelector('#mindmap-preview');
+  const status = content.querySelector('#mindmap-status');
+  const meta = content.querySelector('#mindmap-input-meta');
+  const transparent = content.querySelector('#mindmap-transparent');
+  let currentSvg = '';
+  let scale = 1;
+  let panX = 0;
+  let panY = 0;
+  let dragging = false;
+  let dragStart = null;
+  const getColors = () => {
+    const styles = getComputedStyle(document.documentElement);
+    return { background: styles.getPropertyValue('--panel').trim() || '#ffffff', textColor: styles.getPropertyValue('--text').trim() || '#273248' };
+  };
+  const applyTransform = () => {
+    const svg = preview.querySelector('svg');
+    if (!svg) return;
+    svg.style.transformOrigin = 'center center';
+    svg.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  };
+  const render = () => {
+    const parsed = renderMindmapSvg(input.value, { ...getColors(), transparent: transparent.checked });
+    currentSvg = parsed.svg;
+    preview.innerHTML = currentSvg;
+    applyTransform();
+    status.textContent = `已生成 · ${parsed.graph.count} 个节点`;
+    status.className = 'crypto-status-success';
+    meta.textContent = `${input.value.length} 字符 · 实时解析`;
+  };
+  const fit = () => { scale = 1; panX = 0; panY = 0; applyTransform(); };
+  content.querySelectorAll('[data-mindmap-template]').forEach((button) => button.addEventListener('click', () => {
+    const preset = mindmapTemplatePresets[button.dataset.mindmapTemplate];
+    if (!preset) return;
+    input.value = preset.content;
+    content.querySelectorAll('[data-mindmap-template]').forEach((item) => { item.classList.toggle('is-active', item === button); item.setAttribute('aria-selected', item === button ? 'true' : 'false'); });
+    fit();
+    render();
+  }));
+  content.querySelector('[data-mindmap-action="copy"]').addEventListener('click', () => copyText(input.value).then(() => showToast('Markdown 大纲已复制')));
+  content.querySelector('[data-mindmap-action="link"]').addEventListener('click', () => {
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const selected = input.value.slice(start, end) || '链接文本';
+    const snippet = `[${selected}](https://example.com)`;
+    input.setRangeText(snippet, start, end, 'end');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  });
+  content.querySelector('[data-mindmap-action="clear"]').addEventListener('click', () => { input.value = ''; fit(); render(); input.focus(); });
+  content.querySelector('[data-mindmap-action="fit"]').addEventListener('click', fit);
+  content.querySelector('[data-mindmap-action="download-svg"]').addEventListener('click', () => downloadTextFile(currentSvg, 'byetools-mindmap.svg', 'image/svg+xml;charset=utf-8'));
+  content.querySelector('[data-mindmap-action="download-png"]').addEventListener('click', async () => {
+    const svgNode = preview.querySelector('svg');
+    if (!svgNode) return;
+    const match = currentSvg.match(/viewBox="0 0 (\d+) (\d+)"/);
+    const width = Number(match?.[1]) || 1200;
+    const height = Number(match?.[2]) || 600;
+    const blobUrl = URL.createObjectURL(new Blob([currentSvg], { type: 'image/svg+xml;charset=utf-8' }));
+    try {
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = blobUrl;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      const ratio = 2;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      const context = canvas.getContext('2d');
+      context.scale(ratio, ratio);
+      context.drawImage(image, 0, 0, width, height);
+      canvas.toBlob((png) => { if (png) { downloadBlob(png, 'byetools-mindmap.png'); showToast('PNG 已导出'); } else showToast('PNG 导出失败'); });
+    } catch (error) {
+      showToast(`PNG 导出失败：${error.message}`);
+    } finally { URL.revokeObjectURL(blobUrl); }
+  });
+  transparent.addEventListener('change', render);
+  input.addEventListener('input', render);
+  preview.addEventListener('wheel', (event) => { event.preventDefault(); scale = Math.min(2.4, Math.max(.55, scale * (event.deltaY < 0 ? 1.08 : .92))); applyTransform(); }, { passive: false });
+  preview.addEventListener('pointerdown', (event) => { dragging = true; dragStart = { x: event.clientX - panX, y: event.clientY - panY }; preview.setPointerCapture(event.pointerId); preview.classList.add('is-dragging'); });
+  preview.addEventListener('pointermove', (event) => { if (!dragging) return; panX = event.clientX - dragStart.x; panY = event.clientY - dragStart.y; applyTransform(); });
+  preview.addEventListener('pointerup', () => { dragging = false; preview.classList.remove('is-dragging'); });
+  preview.addEventListener('pointercancel', () => { dragging = false; preview.classList.remove('is-dragging'); });
+  render();
+  activeWorkspaceCleanup = () => { dragging = false; };
+}
+
 function parseMermaidSource(source) {
   const lines = source.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const direction = (lines[0]?.match(/(?:flowchart|graph)\s+(LR|RL|TB|BT)/i)?.[1] || 'LR').toUpperCase();
@@ -2182,8 +2435,8 @@ function renderMarkdown(value) {
   html = html.replace(/((?:<li data-ordered="true">.*<\/li>\n?)+)/g, (list) => `<ol>${list.replace(/ data-ordered="true"/g, '')}</ol>`);
   html = html.replace(/^---+$/gm, '<hr />');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/~~(.+?)~~/g, '<del>$1</del>').replace(/\*([^*\n]+)\*/g, '<em>$1</em>').replace(/`([^`\n]+)`/g, '<code>$1</code>');
-  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
   html = html.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+|data:image\/[a-z0-9.+-]+;base64,[^\s)]+)\)/gi, '<img src="$2" alt="$1" loading="lazy" />');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
   html = html.replace(/\$\$([^$\n]+)\$\$/g, (_, formula) => `<div class="markdown-math-block">$$${formula}$$</div>`).replace(/\$([^$\n]+)\$/g, (_, formula) => `<span class="markdown-math">$${formula}$</span>`);
   html = html.split(/\n{2,}/).map((block) => /^(?:<(?:h[1-6]|ul|ol|blockquote|pre|hr|table|div class="markdown-math-block")|\uE000)/.test(block) ? block : `<p>${block.replace(/\n/g, '<br />')}</p>`).join('');
   return html.replace(/\uE000code(\d+)\uE001/g, (_, index) => codeBlocks[Number(index)] || '').replace(/\uE000table(\d+)\uE001/g, (_, index) => tableBlocks[Number(index)] || '');
@@ -2245,30 +2498,80 @@ function markdownEditorSafeFilename(value) {
   return normalized.toLowerCase().endsWith('.md') || normalized.toLowerCase().endsWith('.markdown') ? normalized : `${normalized}.md`;
 }
 
+function markdownFromHtml(root) {
+  const inline = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue.replace(/\u00a0/g, ' ');
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const content = [...node.childNodes].map(inline).join('');
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'br') return '\n';
+    if (tag === 'strong' || tag === 'b') return `**${content}**`;
+    if (tag === 'em' || tag === 'i') return `*${content}*`;
+    if (tag === 'del' || tag === 's' || tag === 'strike') return `~~${content}~~`;
+    if (tag === 'code' && node.parentElement?.tagName.toLowerCase() !== 'pre') return `\`${content}\``;
+    if (tag === 'a') return `[${content}](${node.getAttribute('href') || 'https://example.com'})`;
+    if (tag === 'img') return `![${node.getAttribute('alt') || '图片'}](${node.getAttribute('src') || ''})`;
+    return content;
+  };
+  const block = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue.trim();
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const tag = node.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(tag)) return `${'#'.repeat(Number(tag.slice(1)))} ${inline(node).trim()}\n\n`;
+    if (tag === 'p' || tag === 'div') return `${inline(node).trim()}\n\n`;
+    if (tag === 'blockquote') return `${inline(node).split('\n').map((line) => `> ${line}`).join('\n')}\n\n`;
+    if (tag === 'pre') return `\`\`\`\n${node.textContent.replace(/\n+$/, '')}\n\`\`\`\n\n`;
+    if (tag === 'hr') return '---\n\n';
+    if (tag === 'ul' || tag === 'ol') {
+      const ordered = tag === 'ol';
+      return [...node.children].filter((child) => child.tagName.toLowerCase() === 'li').map((item, index) => {
+        const checkbox = item.querySelector(':scope > input[type="checkbox"]');
+        const text = [...item.childNodes].filter((child) => child !== checkbox).map(inline).join('').trim();
+        return `${ordered ? `${index + 1}.` : '-'} ${checkbox ? `[${checkbox.checked ? 'x' : ' '}] ` : ''}${text}`;
+      }).join('\n') + '\n\n';
+    }
+    if (tag === 'table') {
+      const rows = [...node.querySelectorAll('tr')].map((row) => [...row.children].map((cell) => inline(cell).replace(/\|/g, '\\|').trim()));
+      if (!rows.length) return '';
+      const columns = rows[0].length;
+      const divider = Array.from({ length: columns }, () => '---');
+      return `| ${rows[0].join(' | ')} |\n| ${divider.join(' | ')} |\n${rows.slice(1).map((row) => `| ${row.join(' | ')} |`).join('\n')}\n\n`;
+    }
+    return inline(node).trim() ? `${inline(node).trim()}\n\n` : '';
+  };
+  return [...root.childNodes].map(block).join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function bindMarkdownEditorWorkspace() {
   const content = refs.workspace.querySelector('#workspace-content');
+  const workbench = content.closest('.markdown-editor-workbench');
+  const layout = content.querySelector('[data-markdown-editor-layout]');
   const input = content.querySelector('#markdown-editor-input');
+  const visual = content.querySelector('#markdown-editor-visual');
   const preview = content.querySelector('#markdown-editor-preview');
   const lineNumbers = content.querySelector('#markdown-editor-line-numbers');
   const count = content.querySelector('#markdown-editor-count');
   const fileInput = content.querySelector('#markdown-editor-file-input');
   const filename = content.querySelector('#markdown-editor-filename');
+  const heading = content.querySelector('#markdown-editor-heading');
   const status = content.querySelector('#markdown-editor-status');
   const previewMeta = content.querySelector('#markdown-editor-preview-meta');
   let draftTimer = null;
   let dirty = false;
   let userInteracted = false;
   let loadToken = 0;
+  let activeView = 'split';
   const setStatus = (value, stateClass = '') => { status.textContent = value; status.className = `markdown-editor-status ${stateClass}`.trim(); };
   const updateLineNumbers = () => {
     const lines = input.value.split(/\r?\n/).length;
     lineNumbers.textContent = Array.from({ length: lines }, (_, index) => index + 1).join('\n');
     count.textContent = `${input.value.length} 字符 · ${lines} 行`;
   };
-  const render = () => {
+  const render = ({ syncVisual = false } = {}) => {
     preview.innerHTML = renderMarkdown(input.value);
     updateLineNumbers();
     previewMeta.textContent = `${input.value.length} 字符 · 实时更新`;
+    if (syncVisual) visual.innerHTML = renderMarkdown(input.value);
   };
   const persistDraft = () => {
     if (!storage) return;
@@ -2286,24 +2589,67 @@ function bindMarkdownEditorWorkspace() {
     input.value = String(value ?? '');
     filename.value = markdownEditorSafeFilename(name);
     dirty = false;
-    render();
+    render({ syncVisual: activeView === 'edit' });
     setStatus(sourceLabel ? `已打开 · ${sourceLabel}` : '本地草稿', 'is-success');
     persistDraft();
   };
-  const insertFormat = (format) => {
+  const insertSourceFormat = (format) => {
     const start = input.selectionStart;
     const end = input.selectionEnd;
-    const selected = input.value.slice(start, end) || (format === 'link' ? '链接文字' : '文本');
-    const wrappers = { bold: ['**', '**'], italic: ['*', '*'], code: ['`', '`'], link: ['[', '](https://example.com)'] };
+    const selected = input.value.slice(start, end) || (format === 'link' ? '链接文字' : format === 'image' ? '图片描述' : '文本');
+    const headingLevel = Math.max(1, Math.min(6, Number(heading?.value || 1)));
+    const wrappers = { bold: ['**', '**'], italic: ['*', '*'], strike: ['~~', '~~'], code: ['`', '`'], link: ['[', '](https://example.com)'], image: ['![', '](https://example.com/image.png)'], math: ['$', '$'] };
     let replacement = '';
-    if (format === 'heading') replacement = selected.split('\n').map((line) => `## ${line.replace(/^#{1,6}\s*/, '')}`).join('\n');
+    if (format === 'heading') replacement = selected.split('\n').map((line) => `${'#'.repeat(headingLevel)} ${line.replace(/^#{1,6}\s*/, '')}`).join('\n');
     else if (format === 'unordered') replacement = selected.split('\n').map((line) => `- ${line.replace(/^[-*]\s*/, '')}`).join('\n');
     else if (format === 'ordered') replacement = selected.split('\n').map((line, index) => `${index + 1}. ${line.replace(/^\d+\.\s*/, '')}`).join('\n');
+    else if (format === 'task') replacement = selected.split('\n').map((line) => `- [ ] ${line.replace(/^[-*]\s*(?:\[[ xX]\]\s*)?/, '')}`).join('\n');
     else if (format === 'quote') replacement = selected.split('\n').map((line) => `> ${line.replace(/^>\s?/, '')}`).join('\n');
+    else if (format === 'code-block') replacement = `\`\`\`text\n${selected}\n\`\`\``;
+    else if (format === 'table') replacement = '| 项目 | 说明 |\n| --- | --- |\n| 内容 | 在这里填写 |';
+    else if (format === 'hr') replacement = '---';
     else replacement = `${wrappers[format][0]}${selected}${wrappers[format][1]}`;
     input.setRangeText(replacement, start, end, 'select');
     input.focus();
     markDirty();
+  };
+  const syncSourceFromVisual = () => {
+    input.value = markdownFromHtml(visual);
+    dirty = true;
+    userInteracted = true;
+    setStatus('有未保存修改', 'is-warning');
+    render();
+    persistDraft();
+  };
+  const insertVisualFormat = (format) => {
+    visual.focus();
+    const commandMap = { bold: 'bold', italic: 'italic', strike: 'strikeThrough', unordered: 'insertUnorderedList', ordered: 'insertOrderedList', quote: 'formatBlock' };
+    if (commandMap[format]) {
+      if (format === 'quote') document.execCommand(commandMap[format], false, 'blockquote');
+      else document.execCommand(commandMap[format], false);
+    } else if (format === 'heading') document.execCommand('formatBlock', false, `h${Math.max(1, Math.min(6, Number(heading?.value || 1)))}`);
+    else if (format === 'link') document.execCommand('createLink', false, 'https://example.com');
+    else if (format === 'image') document.execCommand('insertHTML', false, '<img src="https://example.com/image.png" alt="图片描述" />');
+    else if (format === 'table') document.execCommand('insertHTML', false, '<table><thead><tr><th>项目</th><th>说明</th></tr></thead><tbody><tr><td>内容</td><td>在这里填写</td></tr></tbody></table>');
+    else if (format === 'hr') document.execCommand('insertHorizontalRule', false);
+    else if (format === 'code-block') document.execCommand('formatBlock', false, 'pre');
+    else if (format === 'task') document.execCommand('insertText', false, '☐ ');
+    else if (format === 'math') document.execCommand('insertText', false, '$x^2$');
+    else if (format === 'code') document.execCommand('insertHTML', false, `<code>${escapeHtml(window.getSelection()?.toString() || '文本')}</code>`);
+    syncSourceFromVisual();
+  };
+  const applyFormat = (format) => { if (activeView === 'edit') insertVisualFormat(format); else insertSourceFormat(format); };
+  const setView = (view) => {
+    if (!['edit', 'source', 'split', 'preview'].includes(view)) return;
+    activeView = view;
+    layout.dataset.markdownView = view;
+    content.querySelectorAll('[data-markdown-editor-view]').forEach((button) => {
+      const selected = button.dataset.markdownEditorView === view;
+      button.classList.toggle('is-active', selected);
+      button.setAttribute('aria-selected', String(selected));
+    });
+    if (view === 'edit') visual.innerHTML = renderMarkdown(input.value);
+    render();
   };
   const save = () => {
     const name = markdownEditorSafeFilename(filename.value);
@@ -2338,27 +2684,40 @@ function bindMarkdownEditorWorkspace() {
       setStatus('本地草稿读取失败', 'is-error');
     }
   };
+  const toggleFullscreen = () => {
+    const fullscreen = workbench.classList.toggle('is-fullscreen');
+    setStatus(fullscreen ? '已进入全屏' : (dirty ? '有未保存修改' : '本地草稿'), fullscreen ? 'is-success' : dirty ? 'is-warning' : '');
+  };
+  const onDocumentKeydown = (event) => { if (event.key === 'Escape' && workbench.classList.contains('is-fullscreen')) { workbench.classList.remove('is-fullscreen'); setStatus(dirty ? '有未保存修改' : '本地草稿', dirty ? 'is-warning' : ''); } };
   input.addEventListener('input', markDirty);
   input.addEventListener('scroll', () => { lineNumbers.scrollTop = input.scrollTop; });
+  visual.addEventListener('input', syncSourceFromVisual);
   filename.addEventListener('change', () => { userInteracted = true; filename.value = markdownEditorSafeFilename(filename.value); if (dirty) setStatus('有未保存修改', 'is-warning'); });
+  heading?.addEventListener('change', () => applyFormat('heading'));
   fileInput.addEventListener('change', () => { openFile(fileInput.files?.[0]); fileInput.value = ''; });
   content.addEventListener('click', (event) => {
+    const view = event.target.closest('[data-markdown-editor-view]')?.dataset.markdownEditorView;
+    if (view) { setView(view); return; }
     const format = event.target.closest('[data-markdown-editor-format]')?.dataset.markdownEditorFormat;
-    if (format) { insertFormat(format); return; }
+    if (format) { applyFormat(format); return; }
     const action = event.target.closest('[data-markdown-editor-action]')?.dataset.markdownEditorAction;
     if (!action) return;
     if (action === 'save') save();
     if (action === 'copy-html') copyText(preview.innerHTML).then(() => showToast('预览 HTML 已复制'));
-    if (action === 'clear') { userInteracted = true; input.value = ''; dirty = true; render(); setStatus('有未保存修改', 'is-warning'); persistDraft(); input.focus(); }
-    if (action === 'new') { userInteracted = true; input.value = ''; filename.value = 'untitled.md'; dirty = true; render(); setStatus('新建文档', 'is-warning'); persistDraft(); input.focus(); }
+    if (action === 'copy-markdown') copyText(input.value).then(() => showToast('Markdown 源码已复制'));
+    if (action === 'fullscreen') toggleFullscreen();
+    if (action === 'clear') { userInteracted = true; input.value = ''; dirty = true; render({ syncVisual: activeView === 'edit' }); setStatus('有未保存修改', 'is-warning'); persistDraft(); input.focus(); }
+    if (action === 'new') { userInteracted = true; input.value = ''; filename.value = 'untitled.md'; dirty = true; render({ syncVisual: activeView === 'edit' }); setStatus('新建文档', 'is-warning'); persistDraft(); input.focus(); }
   });
   content.addEventListener('keydown', (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); save(); }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); fileInput.click(); }
   });
+  document.addEventListener('keydown', onDocumentKeydown);
+  setView('split');
   render();
   restoreDraft();
-  activeWorkspaceCleanup = () => { clearTimeout(draftTimer); loadToken += 1; };
+  activeWorkspaceCleanup = () => { clearTimeout(draftTimer); loadToken += 1; document.removeEventListener('keydown', onDocumentKeydown); };
 }
 
 const imageToolModes = [
@@ -4000,6 +4359,8 @@ const btSelectIconDefinitions = {
   'crypto-ctr-length': ['#', 'icon-aes'],
   'crypto-gcm-tag-length': ['✓', 'icon-aes'],
   'crypto-format': ['⇩', 'icon-aes'],
+  'crypto-key-encoding': ['K', 'icon-aes'],
+  'crypto-iv-encoding': ['IV', 'icon-aes'],
 };
 
 const btSelectDescriptionDefinitions = {
@@ -4037,6 +4398,8 @@ const btSelectDescriptionDefinitions = {
   'crypto-ctr-length': { 32: '使用 32 位计数器', 64: '使用 64 位计数器', 128: '使用 128 位计数器' },
   'crypto-gcm-tag-length': { 32: '使用 32 位认证标签', 64: '使用 64 位认证标签', 96: '使用 96 位认证标签', 104: '使用 104 位认证标签', 112: '使用 112 位认证标签', 120: '使用 120 位认证标签', 128: '使用 128 位认证标签' },
   'crypto-format': { hex: '以十六进制文本输出', base64: '以 Base64 文本输出' },
+  'crypto-key-encoding': { utf8: '按 UTF-8 文本读取', hex: '按十六进制字节读取', base64: '按 Base64 字节读取' },
+  'crypto-iv-encoding': { utf8: '按 UTF-8 文本读取', hex: '按十六进制字节读取', base64: '按 Base64 字节读取' },
 };
 
 let btSelectSequence = 0;
@@ -4248,8 +4611,13 @@ function cryptoWorkbenchMarkup(tool) {
   const modeMarkup = isDigest || isAsymmetric ? '' : `<label class="crypto-field"><span>加密模式</span><select id="crypto-mode">${cryptoModeOptions(tool)}</select></label>`;
   const modeCapabilityMarkup = isDigest || isAsymmetric ? '' : `<span class="crypto-mode-capability crypto-mode-capability-${initialModeCapability}" id="crypto-mode-capability"><i></i>${cryptoModeCapabilityLabel(initialModeCapability)}</span>`;
   const symmetricKeyHint = tool.id === 'aes' ? '16 / 24 / 32 字节（128 / 192 / 256 bit）' : tool.id === 'sm4' ? '固定 16 字节（128 bit）' : tool.id === 'des' ? '固定 8 字节（64 bit）' : '16 或 24 字节（128 或 192 bit）';
-  const keyMarkup = !isDigest ? `<label class="crypto-field crypto-key-field"><span>${isAsymmetric ? 'Hex 密钥' : '密钥'} <small>${isAsymmetric ? '公钥 130 位或私钥 64 位 Hex' : symmetricKeyHint}</small></span><input id="crypto-key" type="text" spellcheck="false" autocomplete="off" placeholder="${isAsymmetric ? '输入 04 开头的公钥或 64 位私钥…' : '输入原文密钥…'}" value="${isAes ? 'ByeToolsKey12345' : ''}" /></label>` : '';
-  const ivMarkup = !isDigest && !isAsymmetric ? `<label class="crypto-field" id="crypto-iv-field"><span><b id="crypto-iv-label">${modeHint[0]}</b> <small id="crypto-iv-hint">${modeHint[1]}</small></span><input id="crypto-iv" type="text" spellcheck="false" autocomplete="off" placeholder="输入原文 ${modeHint[0]}…" value="${isAes ? 'ByeToolsIV12' : ''}" /></label>` : '';
+  const sm4EncodingOptions = '<option value="utf8" selected>UTF-8</option><option value="hex">Hex</option><option value="base64">Base64</option>';
+  const sm4KeyMarkup = `<div class="crypto-field crypto-key-field crypto-secret-field" data-crypto-secret="key"><div class="crypto-secret-head"><label class="crypto-secret-label" for="crypto-key"><span>密钥 <small>KEY</small></span></label><span class="crypto-secret-length" id="crypto-key-length" data-crypto-length="key">需 16 字节</span><label class="crypto-secret-encoding"><span class="sr-only">密钥编码</span><select id="crypto-key-encoding" aria-label="密钥编码">${sm4EncodingOptions}</select></label><button class="secondary-button crypto-random-button" type="button" data-crypto-random="key" title="随机生成 16 字节密钥">随机</button></div><input id="crypto-key" type="text" spellcheck="false" autocomplete="off" placeholder="输入 UTF-8 原文密钥…" /></div>`;
+  const sm4IvMarkup = `<div class="crypto-field crypto-secret-field" id="crypto-iv-field" data-crypto-secret="iv"><div class="crypto-secret-head"><label class="crypto-secret-label" for="crypto-iv"><span><b id="crypto-iv-label">偏移量 IV</b> <small id="crypto-iv-hint">${modeHint[1]}</small></span></label><span class="crypto-secret-length" id="crypto-iv-length" data-crypto-length="iv">需 16 字节</span><label class="crypto-secret-encoding"><span class="sr-only">IV 编码</span><select id="crypto-iv-encoding" aria-label="IV 编码">${sm4EncodingOptions}</select></label><button class="secondary-button crypto-random-button" type="button" data-crypto-random="iv" title="随机生成 16 字节 IV">随机</button></div><input id="crypto-iv" type="text" spellcheck="false" autocomplete="off" placeholder="输入 UTF-8 原文 IV…" value="" /></div>`;
+  const sm2KeyMarkup = `<section class="crypto-sm2-key-panel crypto-key-field" data-sm2-key-panel><div class="crypto-sm2-panel-head"><div class="crypto-sm2-panel-title"><strong>SM2 密钥对</strong><span>Hex</span></div><div class="crypto-sm2-key-actions"><button class="secondary-button" type="button" data-sm2-key-action="derive">由私钥推导公钥</button><button class="primary-button" type="button" data-sm2-key-action="generate">生成密钥对</button></div></div><div class="crypto-sm2-key-grid"><div class="crypto-sm2-key-field"><div class="crypto-sm2-key-field-head"><label for="crypto-key">公钥 <small>04 + X + Y，130 位</small></label><button class="secondary-button" type="button" data-sm2-key-action="copy-public">复制</button></div><textarea id="crypto-key" spellcheck="false" autocomplete="off" placeholder="输入 04 开头的公钥…"></textarea><span class="crypto-sm2-key-status" id="crypto-sm2-public-status">等待输入</span></div><div class="crypto-sm2-key-field"><div class="crypto-sm2-key-field-head"><label for="crypto-private-key">私钥 <small>64 位</small></label><button class="secondary-button" type="button" data-sm2-key-action="copy-private">复制</button></div><textarea id="crypto-private-key" spellcheck="false" autocomplete="off" placeholder="输入 64 位私钥…"></textarea><span class="crypto-sm2-key-status" id="crypto-sm2-private-status">等待输入</span></div></div></section>`;
+  const sm2CompatibilityMarkup = `<section class="crypto-sm2-compatibility"><div class="crypto-sm2-compatibility-grid"><label class="crypto-field"><span>密文排列</span><select id="sm2-cipher-mode"><option value="1" selected>C1C3C2 · 现行国标</option><option value="0">C1C2C3 · 兼容旧系统</option></select></label><div class="crypto-sm2-compatibility-options"><strong>兼容选项</strong><label><input id="sm2-cipher-prefix" type="checkbox" />密文加 04 前缀</label><label><input id="sm2-cipher-der" type="checkbox" />ASN.1 DER 密文</label></div></div><div class="crypto-sm2-compatibility-note">解密时 <b>04 前缀</b>会自动识别，带不带都能解；若报错，多半是“密文排列”选反了，对调 C1C3C2 / C1C2C3 再试。</div></section>`;
+  const keyMarkup = !isDigest ? tool.id === 'sm4' ? sm4KeyMarkup : tool.id === 'sm2' ? sm2KeyMarkup : `<label class="crypto-field crypto-key-field"><span>${isAsymmetric ? 'Hex 密钥' : '密钥'} <small>${isAsymmetric ? '公钥 130 位或私钥 64 位 Hex' : symmetricKeyHint}</small></span><input id="crypto-key" type="text" spellcheck="false" autocomplete="off" placeholder="${isAsymmetric ? '输入 04 开头的公钥或 64 位私钥…' : '输入原文密钥…'}" value="${isAes ? 'ByeToolsKey12345' : ''}" /></label>` : '';
+  const ivMarkup = !isDigest && !isAsymmetric ? tool.id === 'sm4' ? sm4IvMarkup : `<label class="crypto-field" id="crypto-iv-field"><span><b id="crypto-iv-label">${modeHint[0]}</b> <small id="crypto-iv-hint">${modeHint[1]}</small></span><input id="crypto-iv" type="text" spellcheck="false" autocomplete="off" placeholder="输入原文 ${modeHint[0]}…" value="${isAes ? 'ByeToolsIV12' : ''}" /></label>` : '';
   const paddingMarkup = !isDigest && !isAsymmetric ? `<label class="crypto-field"><span>填充方式</span><select id="crypto-padding">${cryptoPaddingOptions(tool, initialMode)}</select></label>` : '';
   const ctrLengthMarkup = tool.id === 'aes' ? '<label class="crypto-field crypto-ctr-length-field" id="crypto-ctr-length-field" hidden><span>计数器长度</span><select id="crypto-ctr-length"><option value="64" selected>64 bit</option><option value="32">32 bit</option><option value="128">128 bit</option></select></label>' : '';
   const gcmTagMarkup = tool.id === 'aes' ? '<label class="crypto-field crypto-gcm-tag-field" id="crypto-gcm-tag-field" hidden><span>认证标签</span><select id="crypto-gcm-tag-length"><option value="128" selected>128 bit</option><option value="120">120 bit</option><option value="112">112 bit</option><option value="104">104 bit</option><option value="96">96 bit</option><option value="64">64 bit</option><option value="32">32 bit</option></select></label>' : '';
@@ -4277,6 +4645,7 @@ function cryptoWorkbenchMarkup(tool) {
       ${paddingMarkup}
       ${ctrLengthMarkup}
       ${gcmTagMarkup}
+      ${tool.id === 'sm2' ? sm2CompatibilityMarkup : ''}
       <label class="crypto-field"><span>输出格式</span><select id="crypto-format"><option value="hex" ${isDigest ? 'selected' : ''}>Hex</option><option value="base64" ${isDigest ? '' : 'selected'}>Base64</option></select></label>
     </div>
     <div class="crypto-action-bar"><div class="crypto-action-main">${operationButtons}</div><div class="crypto-action-secondary"><button class="secondary-button" type="button" data-tool-action="crypto-clear">清空</button><button class="secondary-button" type="button" data-tool-action="copy-crypto-output">复制结果</button></div><div class="crypto-config-actions" aria-label="加密配置"><button class="secondary-button" type="button" data-crypto-config-action="save">保存配置</button><button class="secondary-button" type="button" data-crypto-config-action="history">配置历史</button></div></div>
@@ -4519,7 +4888,13 @@ const cryptoConfigFieldLabels = {
   'crypto-mode': '加密模式',
   'crypto-key-length': '密钥长度',
   'crypto-key': '密钥',
+  'crypto-private-key': 'SM2 私钥',
+  'crypto-key-encoding': '密钥编码',
   'crypto-iv': 'IV / Nonce',
+  'crypto-iv-encoding': 'IV 编码',
+  'sm2-cipher-mode': '密文排列',
+  'sm2-cipher-prefix': '密文 04 前缀',
+  'sm2-cipher-der': 'ASN.1 DER',
   'crypto-padding': '填充方式',
   'crypto-ctr-length': '计数器长度',
   'crypto-gcm-tag-length': '认证标签',
@@ -4530,7 +4905,7 @@ function collectCryptoConfigPayload(tool, content) {
   const fields = getWorkspaceConfigControls(content)
     .map((node) => {
       const key = configControlKey(node);
-      const sensitive = key === 'crypto-key' || key === 'crypto-iv';
+      const sensitive = key === 'crypto-key' || key === 'crypto-private-key' || key === 'crypto-iv';
       const type = node.tagName === 'SELECT' ? 'select' : sensitive ? 'secret' : node.type === 'number' ? 'number' : node.type === 'checkbox' || node.type === 'radio' ? 'boolean' : 'text';
       return { key, type, value: readWorkspaceControlValue(node), sensitive, required: Boolean(node.required) };
     })
@@ -4552,24 +4927,28 @@ function maskCryptoConfigValue(value) {
 
 function cryptoConfigReadableValue(key, value, mask = false, payload = null) {
   if (key === 'crypto-algorithm') return getTool(value)?.name || value || '未设置';
-  if (key === 'crypto-key' || key === 'crypto-iv') return mask ? maskCryptoConfigValue(value) : value || '未设置';
+  if (key === 'crypto-key' || key === 'crypto-private-key' || key === 'crypto-iv') return mask ? maskCryptoConfigValue(value) : value || '未设置';
   if (key === 'crypto-mode' && value) {
     const algorithm = cryptoConfigFieldValue(payload, 'crypto-algorithm');
     const prefix = algorithm === 'aes' ? 'AES' : algorithm === 'sm4' ? 'SM4' : algorithm === '3des' ? '3DES' : algorithm === 'des' ? 'DES' : '';
     return String(value).includes('-') || !prefix ? value : `${prefix}-${value}`;
   }
   if (['crypto-key-length', 'crypto-ctr-length', 'crypto-gcm-tag-length'].includes(key) && value) return `${value} bit`;
+  if (['crypto-key-encoding', 'crypto-iv-encoding'].includes(key) && value) return value === 'utf8' ? 'UTF-8' : String(value).toUpperCase();
+  if (key === 'sm2-cipher-mode') return value === '0' ? 'C1C2C3' : 'C1C3C2';
+  if (['sm2-cipher-prefix', 'sm2-cipher-der'].includes(key)) return value ? '启用' : '停用';
   if (key === 'crypto-padding' && value === 'NONE') return 'NoPadding';
   if (key === 'crypto-format' && value) return String(value).toUpperCase();
   return value === '' || value == null ? '未设置' : String(value);
 }
 
 function cryptoConfigSummaryMarkup(payload, mask = false) {
-  const rows = ['crypto-algorithm', 'crypto-variant', 'crypto-mode', 'crypto-key-length', 'crypto-key', 'crypto-iv', 'crypto-padding', 'crypto-ctr-length', 'crypto-gcm-tag-length', 'crypto-format']
+  const rows = ['crypto-algorithm', 'crypto-variant', 'crypto-mode', 'crypto-key-length', 'crypto-key', 'crypto-private-key', 'crypto-key-encoding', 'crypto-iv', 'crypto-iv-encoding', 'crypto-padding', 'crypto-ctr-length', 'crypto-gcm-tag-length', 'sm2-cipher-mode', 'sm2-cipher-prefix', 'sm2-cipher-der', 'crypto-format']
     .map((key) => {
       const value = cryptoConfigFieldValue(payload, key);
       if (value === '' || value == null) return '';
-      return `<div class="crypto-config-summary-row"><span>${cryptoConfigFieldLabels[key]}</span><code class="${key === 'crypto-key' || key === 'crypto-iv' ? 'is-secret' : ''}">${escapeHtml(cryptoConfigReadableValue(key, value, mask, payload))}</code></div>`;
+      const label = payload?.toolId === 'sm2' && key === 'crypto-key' ? 'SM2 公钥' : cryptoConfigFieldLabels[key];
+      return `<div class="crypto-config-summary-row"><span>${label}</span><code class="${key === 'crypto-key' || key === 'crypto-private-key' || key === 'crypto-iv' ? 'is-secret' : ''}">${escapeHtml(cryptoConfigReadableValue(key, value, mask, payload))}</code></div>`;
     })
     .filter(Boolean)
     .join('');
@@ -4579,7 +4958,7 @@ function cryptoConfigSummaryMarkup(payload, mask = false) {
 }
 
 function cryptoConfigHasSecret(payload) {
-  return ['crypto-key', 'crypto-iv'].some((key) => payload?.fields?.some((field) => field.key === key && field.value));
+  return ['crypto-key', 'crypto-private-key', 'crypto-iv'].some((key) => payload?.fields?.some((field) => field.key === key && field.value));
 }
 
 function cryptoConfigDate(value) {
@@ -4643,7 +5022,7 @@ async function openCryptoConfigSaveModal(tool, content) {
   const modal = document.createElement('div');
   modal.className = 'crypto-config-modal';
   modal.dataset.cryptoConfigModal = 'save';
-  const secretHint = cryptoConfigHasSecret(payload) ? '密钥与 IV 会随配置正文加密保存' : '只保存当前摘要或加密参数，不保存正文和结果';
+  const secretHint = cryptoConfigHasSecret(payload) ? tool.id === 'sm2' ? 'SM2 公钥和私钥会随配置正文加密保存' : '密钥与 IV 会随配置正文加密保存' : '只保存当前摘要或加密参数，不保存正文和结果';
   const storageHint = storage?.isDesktop ? '桌面版使用 SQLCipher、系统凭证与 AES-256-GCM 加密保存。' : 'Web 版使用本机 IndexedDB 与 AES-GCM 加密保存。';
   modal.innerHTML = `<div class="crypto-config-backdrop" data-crypto-config-close></div><section class="crypto-config-dialog" role="dialog" aria-modal="true" aria-labelledby="crypto-config-dialog-title"><div class="crypto-config-dialog-head"><div><p class="eyebrow">${editingRecord ? 'EDIT CONFIGURATION' : 'SAVE CONFIGURATION'}</p><h2 id="crypto-config-dialog-title">${editingRecord ? '编辑加密配置' : '保存加密配置'}</h2><p>保存当前${escapeHtml(tool.name)}的算法参数，正文和结果不会进入配置。</p></div><button class="icon-button" type="button" data-crypto-config-close aria-label="关闭">×</button></div><label class="crypto-config-name-field"><span>配置名称</span><input id="crypto-config-name" type="text" maxlength="40" autocomplete="off" placeholder="例如：生产接口 AES-GCM" value="${escapeHtml(editingRecord?.name || '')}" /></label><div class="crypto-config-dialog-section"><div class="crypto-config-section-head"><strong>将保存的参数</strong><span>${secretHint}</span></div>${cryptoConfigSummaryMarkup(payload, false)}</div><div class="crypto-config-dialog-note"><span>${storageHint}</span></div><div class="crypto-config-dialog-actions"><button class="secondary-button" type="button" data-crypto-config-close>取消</button><button class="primary-button" type="button" data-crypto-config-modal-action="save">${editingRecord ? '更新配置' : '保存配置'}</button></div></section>`;
   document.body.appendChild(modal);
@@ -4679,7 +5058,7 @@ async function openCryptoConfigHistoryModal(tool, content) {
   const modal = document.createElement('div');
   modal.className = 'crypto-config-modal';
   modal.dataset.cryptoConfigModal = 'history';
-  const historyHint = records.some((record) => cryptoConfigHasSecret(record.payload)) ? '仅显示当前加密工具的配置，密钥和 IV 在列表中以掩码展示。' : '仅显示当前加密工具的配置，列表只展示算法参数。';
+  const historyHint = records.some((record) => cryptoConfigHasSecret(record.payload)) ? `仅显示当前加密工具的配置，${tool.id === 'sm2' ? '公钥和私钥' : '密钥和 IV'} 在列表中以掩码展示。` : '仅显示当前加密工具的配置，列表只展示算法参数。';
   modal.innerHTML = `<div class="crypto-config-backdrop" data-crypto-config-close></div><section class="crypto-config-dialog crypto-config-history-dialog" role="dialog" aria-modal="true" aria-labelledby="crypto-config-history-title"><div class="crypto-config-dialog-head"><div><p class="eyebrow">CONFIGURATION HISTORY</p><h2 id="crypto-config-history-title">${escapeHtml(tool.name)}配置历史</h2><p>${historyHint}</p></div><button class="icon-button" type="button" data-crypto-config-close aria-label="关闭">×</button></div>${cryptoConfigHistoryListMarkup(records)}<div class="crypto-config-dialog-note"><span>配置加密保存在当前设备，并按工具隔离展示。</span></div></section>`;
   document.body.appendChild(modal);
   modal.addEventListener('click', async (event) => {
@@ -4892,18 +5271,149 @@ function base64ToBytes(value) {
   const binary = atob(value.trim());
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
+function cryptoSecretBytesByEncoding(value, label, acceptedLengths, encoding = 'utf8') {
+  const text = String(value ?? '');
+  let bytes;
+  if (encoding === 'hex') bytes = hexToBytes(text, label);
+  else if (encoding === 'base64') bytes = base64ToBytes(text);
+  else bytes = new TextEncoder().encode(text);
+  if (acceptedLengths.includes(bytes.length)) return bytes;
+  const expected = acceptedLengths.length === 1 ? `${acceptedLengths[0]} 字节` : `${acceptedLengths.join('、')} 字节`;
+  const encodingLabel = encoding === 'hex' ? 'Hex' : encoding === 'base64' ? 'Base64' : 'UTF-8';
+  throw new Error(`${label}使用 ${encodingLabel} 编码后应为 ${expected}`);
+}
+function cryptoSecretByteLength(value, encoding = 'utf8') {
+  try {
+    if (encoding === 'hex') return hexToBytes(String(value ?? ''), '内容').length;
+    if (encoding === 'base64') return base64ToBytes(String(value ?? '')).length;
+    return new TextEncoder().encode(String(value ?? '')).length;
+  } catch (error) {
+    return null;
+  }
+}
+function randomCryptoBytes(length) {
+  const bytes = new Uint8Array(length);
+  if (window.crypto?.getRandomValues) return window.crypto.getRandomValues(bytes);
+  for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+  return bytes;
+}
+function randomCryptoText(length) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = randomCryptoBytes(length);
+  return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join('');
+}
+function formatCryptoSecretRandom(encoding, length = 16) {
+  if (encoding === 'hex') return bytesToHex(randomCryptoBytes(length));
+  if (encoding === 'base64') return bytesToBase64(randomCryptoBytes(length));
+  return randomCryptoText(length);
+}
 function formatCryptoBytes(bytes, format) { return format === 'base64' ? bytesToBase64(bytes) : bytesToHex(bytes); }
 function parseCryptoBytes(value, format) { return format === 'base64' ? base64ToBytes(value) : hexToBytes(value, '密文'); }
 function normalizeSm2PublicKey(value) {
-  const normalized = value.replace(/\s+/g, '').replace(/^0x/i, '');
-  if (/^[0-9a-f]{128}$/i.test(normalized)) return `04${normalized.toLowerCase()}`;
-  if (/^04[0-9a-f]{128}$/i.test(normalized)) return normalized.toLowerCase();
+  const normalized = String(value ?? '').replace(/\s+/g, '').replace(/^0x/i, '').toLowerCase();
+  const publicKey = /^[0-9a-f]{128}$/.test(normalized) ? `04${normalized}` : normalized;
+  if (/^04[0-9a-f]{128}$/.test(publicKey) && sm2Library.verifyPublicKey(publicKey)) return publicKey;
   throw new Error('SM2 公钥应为 128 位坐标 Hex，或带 04 前缀的 130 位 Hex');
 }
 function normalizeSm2PrivateKey(value) {
-  const normalized = value.replace(/\s+/g, '').replace(/^0x/i, '');
-  if (!/^[0-9a-f]{64}$/i.test(normalized)) throw new Error('SM2 私钥应为 64 位十六进制内容');
+  const normalized = String(value ?? '').replace(/\s+/g, '').replace(/^0x/i, '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(normalized)) throw new Error('SM2 私钥应为 64 位十六进制内容');
   return normalized.toLowerCase();
+}
+
+function sm2DerLengthBytes(length) {
+  if (length < 128) return [length];
+  const bytes = [];
+  let value = length;
+  while (value > 0) { bytes.unshift(value & 0xff); value >>>= 8; }
+  return [0x80 | bytes.length, ...bytes];
+}
+
+function sm2DerTlv(tag, value) { return [tag, ...sm2DerLengthBytes(value.length), ...value]; }
+
+function sm2DerInteger(hex) {
+  let bytes = [...hexToBytes(hex, 'SM2 坐标')];
+  while (bytes.length > 1 && bytes[0] === 0) bytes.shift();
+  if (bytes[0] & 0x80) bytes.unshift(0);
+  return sm2DerTlv(0x02, bytes);
+}
+
+function sm2DerOctetString(hex, label) { return sm2DerTlv(0x04, [...hexToBytes(hex, label)]); }
+
+function normalizeSm2CipherHex(value) {
+  let normalized = String(value ?? '').replace(/\s+/g, '').toLowerCase();
+  if (!/^[0-9a-f]+$/.test(normalized)) throw new Error('SM2 密文必须是十六进制内容');
+  if (normalized.startsWith('04') && normalized.length >= 194) {
+    const rawPointValid = sm2Library.verifyPublicKey(`04${normalized.slice(0, 128)}`);
+    const prefixedPointValid = sm2Library.verifyPublicKey(`04${normalized.slice(2, 130)}`);
+    if (prefixedPointValid && !rawPointValid) normalized = normalized.slice(2);
+  }
+  return normalized;
+}
+
+function sm2CipherHexParts(cipherHex, cipherMode) {
+  const normalized = normalizeSm2CipherHex(cipherHex);
+  if (!/^[0-9a-f]+$/.test(normalized) || normalized.length < 192 || (normalized.length - 192) % 2 !== 0) throw new Error('SM2 密文长度或格式不正确');
+  const c1x = normalized.slice(0, 64);
+  const c1y = normalized.slice(64, 128);
+  const rest = normalized.slice(128);
+  const c3 = cipherMode === 0 ? rest.slice(-64) : rest.slice(0, 64);
+  const c2 = cipherMode === 0 ? rest.slice(0, -64) : rest.slice(64);
+  if (c2.length % 2 !== 0 || c3.length !== 64) throw new Error('SM2 密文长度或格式不正确');
+  return { c1x, c1y, c2, c3 };
+}
+
+function sm2CipherHexToDer(cipherHex, cipherMode = 1) {
+  const { c1x, c1y, c2, c3 } = sm2CipherHexParts(cipherHex, cipherMode);
+  const ordered = cipherMode === 0 ? [c2, c3] : [c3, c2];
+  const body = [...sm2DerInteger(c1x), ...sm2DerInteger(c1y), ...sm2DerOctetString(ordered[0], 'SM2 摘要'), ...sm2DerOctetString(ordered[1], 'SM2 密文')];
+  return bytesToHex(Uint8Array.from(sm2DerTlv(0x30, body)));
+}
+
+function sm2ReadDerTlv(bytes, offset) {
+  if (offset >= bytes.length) throw new Error('ASN.1 DER 密文不完整');
+  const tag = bytes[offset++];
+  if (offset >= bytes.length) throw new Error('ASN.1 DER 长度字段不完整');
+  const firstLength = bytes[offset++];
+  let length = firstLength;
+  if (firstLength & 0x80) {
+    const lengthBytes = firstLength & 0x7f;
+    if (!lengthBytes || lengthBytes > 4 || offset + lengthBytes > bytes.length) throw new Error('ASN.1 DER 长度字段无效');
+    length = 0;
+    for (let index = 0; index < lengthBytes; index += 1) length = length * 256 + bytes[offset++];
+  }
+  const end = offset + length;
+  if (end > bytes.length) throw new Error('ASN.1 DER 密文长度不完整');
+  return { tag, value: bytes.slice(offset, end), next: end };
+}
+
+function sm2DerFixedInteger(value, label) {
+  let bytes = [...value];
+  while (bytes.length > 32 && bytes[0] === 0) bytes.shift();
+  if (bytes.length !== 32) throw new Error(`${label}长度不正确`);
+  return bytesToHex(Uint8Array.from(bytes));
+}
+
+function sm2DerToCipherHex(cipherHex, cipherMode = 1) {
+  const bytes = hexToBytes(cipherHex, 'ASN.1 DER 密文');
+  const root = sm2ReadDerTlv(bytes, 0);
+  if (root.tag !== 0x30 || root.next !== bytes.length) throw new Error('ASN.1 DER 密文应为完整的 SEQUENCE');
+  const values = [];
+  let offset = 0;
+  while (offset < root.value.length) {
+    const item = sm2ReadDerTlv(root.value, offset);
+    values.push(item);
+    offset = item.next;
+  }
+  if (values.length !== 4 || values[0].tag !== 0x02 || values[1].tag !== 0x02 || values[2].tag !== 0x04 || values[3].tag !== 0x04) throw new Error('ASN.1 DER 密文结构应为 X、Y、摘要和密文');
+  const c1x = sm2DerFixedInteger(values[0].value, 'SM2 X 坐标');
+  const c1y = sm2DerFixedInteger(values[1].value, 'SM2 Y 坐标');
+  const first = bytesToHex(Uint8Array.from(values[2].value));
+  const second = bytesToHex(Uint8Array.from(values[3].value));
+  const c3 = cipherMode === 0 ? second : first;
+  const c2 = cipherMode === 0 ? first : second;
+  if (c3.length !== 64 || !c2.length || c2.length % 2 !== 0) throw new Error('ASN.1 DER 密文中的摘要或密文长度不正确');
+  return `${c1x}${c1y}${cipherMode === 0 ? c2 + c3 : c3 + c2}`;
 }
 
 function bindCryptoWorkspace(tool) {
@@ -4918,6 +5428,24 @@ function bindCryptoWorkspace(tool) {
   const algorithmMenu = content.querySelector('#crypto-algorithm-menu');
   let activeOperation = tool.cryptoType === 'digest' ? 'digest' : 'encrypt';
   const setStatus = (value, stateClass = '') => { status.textContent = value; status.className = stateClass ? `crypto-status-${stateClass}` : ''; };
+  const secretFieldInfo = {
+    key: { input: '#crypto-key', encoding: '#crypto-key-encoding', length: '#crypto-key-length' },
+    iv: { input: '#crypto-iv', encoding: '#crypto-iv-encoding', length: '#crypto-iv-length' },
+  };
+  const syncSecretLength = (kind) => {
+    if (tool.id !== 'sm4') return;
+    const info = secretFieldInfo[kind];
+    const inputNode = content.querySelector(info.input);
+    const encodingNode = content.querySelector(info.encoding);
+    const lengthNode = content.querySelector(info.length);
+    if (!inputNode || !encodingNode || !lengthNode) return;
+    const value = inputNode.value;
+    const length = cryptoSecretByteLength(value, encodingNode.value);
+    const valid = length === 16;
+    lengthNode.className = `crypto-secret-length ${valid ? 'is-valid' : value ? 'is-invalid' : 'is-empty'}`;
+    lengthNode.textContent = valid ? '16 字节 ✓' : length == null ? '格式错误' : `${length} 字节 / 需 16`;
+  };
+  const syncSecretLengths = () => { syncSecretLength('key'); syncSecretLength('iv'); };
   const syncModeOptions = () => {
     const mode = content.querySelector('#crypto-mode')?.value;
     const padding = content.querySelector('#crypto-padding');
@@ -4931,11 +5459,11 @@ function bindCryptoWorkspace(tool) {
     const tagField = content.querySelector('#crypto-gcm-tag-field');
     const modeCapability = content.querySelector('#crypto-mode-capability');
     if (ivField) ivField.hidden = mode === 'ECB';
-    if (ivLabel) ivLabel.textContent = hint[0];
+    if (ivLabel) ivLabel.textContent = tool.id === 'sm4' && mode !== 'ECB' ? '偏移量 IV' : hint[0];
     if (ivHint) ivHint.textContent = hint[1];
     if (ivInput) {
       if (tool.id === 'aes' && ['101112131415161718191a1b', '101112131415161718191a1b1c1d1e1f', 'ByeToolsIV12', 'ByeToolsIV123456'].includes(ivInput.value)) ivInput.value = cryptoDefaultIv(mode);
-      ivInput.placeholder = mode === 'ECB' ? '当前模式无需 IV' : `输入原文 ${hint[0]}…`;
+      ivInput.placeholder = mode === 'ECB' ? '当前模式无需 IV' : tool.id === 'sm4' ? '输入 UTF-8 原文 IV…' : `输入原文 ${hint[0]}…`;
       ivInput.disabled = mode === 'ECB';
     }
     if (counterLengthField) counterLengthField.hidden = mode !== 'CTR';
@@ -4945,6 +5473,7 @@ function bindCryptoWorkspace(tool) {
       modeCapability.className = `crypto-mode-capability crypto-mode-capability-${capability}`;
       modeCapability.replaceChildren(document.createElement('i'), document.createTextNode(cryptoModeCapabilityLabel(capability)));
     }
+    syncSecretLengths();
   };
   const syncInputHint = () => {
     if (!input) return;
@@ -4992,18 +5521,28 @@ function bindCryptoWorkspace(tool) {
     setStatus(`已完成 · ${bytes.length} 字节`, 'success');
   };
   const executeSm2 = async () => {
-    const cipherMode = 1;
+    const cipherMode = Number(content.querySelector('#sm2-cipher-mode')?.value || 1);
+    const useDer = Boolean(content.querySelector('#sm2-cipher-der')?.checked);
+    const usePrefix = Boolean(content.querySelector('#sm2-cipher-prefix')?.checked) && !useDer;
     if (activeOperation === 'encrypt') {
       const publicKey = normalizeSm2PublicKey(content.querySelector('#crypto-key').value);
-      const cipherHex = sm2Library.doEncrypt(input.value, publicKey, cipherMode);
-      const bytes = hexToBytes(cipherHex, 'SM2 密文');
+      let cipherHex = sm2Library.doEncrypt(input.value, publicKey, cipherMode);
+      if (usePrefix) cipherHex = `04${cipherHex}`;
+      if (useDer) cipherHex = sm2CipherHexToDer(cipherHex, cipherMode);
+      const bytes = hexToBytes(cipherHex, useDer ? 'ASN.1 DER 密文' : 'SM2 密文');
       output.textContent = formatCryptoBytes(bytes, format.value);
       setStatus(`已完成 · ${bytes.length} 字节`, 'success');
       return;
     }
-    const privateKey = normalizeSm2PrivateKey(content.querySelector('#crypto-key').value);
-    const cipherHex = bytesToHex(parseCryptoBytes(input.value, format.value));
-    if (cipherHex.length < 192 || (cipherHex.length - 192) % 2 !== 0) throw new Error('SM2 密文长度或格式不正确');
+    const privateKeyInput = content.querySelector('#crypto-private-key')?.value || content.querySelector('#crypto-key').value;
+    const privateKey = normalizeSm2PrivateKey(privateKeyInput);
+    const inputHex = bytesToHex(parseCryptoBytes(input.value, format.value));
+    const cipherHex = useDer
+      ? sm2DerToCipherHex(inputHex, cipherMode)
+      : (() => {
+        const parts = sm2CipherHexParts(inputHex, cipherMode);
+        return `${parts.c1x}${parts.c1y}${cipherMode === 0 ? parts.c2 + parts.c3 : parts.c3 + parts.c2}`;
+      })();
     const plainBytes = sm2Library.doDecrypt(cipherHex, privateKey, cipherMode, { output: 'array' });
     if (!plainBytes.length && cipherHex.length > 192) throw new Error('SM2 密文校验失败，请确认私钥、密文格式和 C1C3C2 顺序');
     const result = Uint8Array.from(plainBytes);
@@ -5013,11 +5552,13 @@ function bindCryptoWorkspace(tool) {
   const executeSm4 = async () => {
     const mode = content.querySelector('#crypto-mode').value;
     if (!['CBC', 'ECB'].includes(mode)) throw new Error(`SM4-${mode} 暂不支持，请使用 CBC 或 ECB 模式`);
-    const keyBytes = cryptoSecretBytes(content.querySelector('#crypto-key').value, 'SM4 密钥', [16]);
+    const keyEncoding = content.querySelector('#crypto-key-encoding')?.value || 'utf8';
+    const ivEncoding = content.querySelector('#crypto-iv-encoding')?.value || 'utf8';
+    const keyBytes = cryptoSecretBytesByEncoding(content.querySelector('#crypto-key').value, 'SM4 密钥', [16], keyEncoding);
     const keyValue = bytesToHex(keyBytes);
     const paddingValue = content.querySelector('#crypto-padding').value;
     const ivInput = content.querySelector('#crypto-iv');
-    const ivValue = mode === 'CBC' ? bytesToHex(cryptoSecretBytes(ivInput.value, 'SM4-CBC 的 IV', [16])) : '';
+    const ivValue = mode === 'CBC' ? bytesToHex(cryptoSecretBytesByEncoding(ivInput.value, 'SM4-CBC 的 IV', [16], ivEncoding)) : '';
     const options = { mode: mode.toLowerCase(), padding: paddingValue === 'NONE' ? 'none' : 'pkcs#7', output: 'array' };
     if (mode === 'CBC') options.iv = ivValue;
     if (activeOperation === 'encrypt') {
@@ -5137,6 +5678,80 @@ function bindCryptoWorkspace(tool) {
   document.addEventListener('click', onAlgorithmDocumentClick);
   content.querySelector('#crypto-mode')?.addEventListener('change', () => { syncModeOptions(); syncInputHint(); });
   format?.addEventListener('change', syncInputHint);
+  if (tool.id === 'sm2') {
+    const publicKeyInput = content.querySelector('#crypto-key');
+    const privateKeyInput = content.querySelector('#crypto-private-key');
+    const publicStatus = content.querySelector('#crypto-sm2-public-status');
+    const privateStatus = content.querySelector('#crypto-sm2-private-status');
+    const syncSm2KeyState = () => {
+      const sync = (inputNode, statusNode, normalizer, validText) => {
+        if (!inputNode || !statusNode) return;
+        const value = inputNode.value.trim();
+        statusNode.className = 'crypto-sm2-key-status';
+        if (!value) { statusNode.textContent = '等待输入'; return; }
+        try { normalizer(value); statusNode.textContent = `${validText} ✓`; statusNode.classList.add('is-valid'); }
+        catch (error) { statusNode.textContent = error.message; statusNode.classList.add('is-invalid'); }
+      };
+      sync(publicKeyInput, publicStatus, normalizeSm2PublicKey, '公钥合法');
+      sync(privateKeyInput, privateStatus, normalizeSm2PrivateKey, '私钥合法');
+    };
+    const syncSm2Compatibility = () => {
+      const der = content.querySelector('#sm2-cipher-der');
+      const prefix = content.querySelector('#sm2-cipher-prefix');
+      if (!der || !prefix) return;
+      prefix.disabled = der.checked;
+      if (der.checked) prefix.checked = false;
+    };
+    publicKeyInput?.addEventListener('input', syncSm2KeyState);
+    privateKeyInput?.addEventListener('input', syncSm2KeyState);
+    content.querySelector('#sm2-cipher-der')?.addEventListener('change', syncSm2Compatibility);
+    content.querySelectorAll('[data-sm2-key-action]').forEach((button) => button.addEventListener('click', () => {
+      const action = button.dataset.sm2KeyAction;
+      if (action === 'generate') {
+        const pair = sm2Library.generateKeyPairHex();
+        publicKeyInput.value = pair.publicKey;
+        privateKeyInput.value = pair.privateKey;
+        publicKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        privateKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        setStatus('已生成 SM2 密钥对', 'success');
+        return;
+      }
+      if (action === 'derive') {
+        try {
+          const privateKey = normalizeSm2PrivateKey(privateKeyInput.value);
+          publicKeyInput.value = sm2Library.getPublicKeyFromPrivateKey(privateKey);
+          publicKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+          setStatus('已由私钥推导公钥', 'success');
+        } catch (error) {
+          privateStatus.textContent = error.message;
+          privateStatus.className = 'crypto-sm2-key-status is-invalid';
+          setStatus('输入有误', 'error');
+        }
+        return;
+      }
+      const source = action === 'copy-public' ? publicKeyInput : privateKeyInput;
+      if (!source.value.trim()) { showToast(`请先输入${action === 'copy-public' ? '公钥' : '私钥'}`); return; }
+      copyText(source.value.trim()).then(() => showToast(`${action === 'copy-public' ? '公钥' : '私钥'}已复制`));
+    }));
+    syncSm2Compatibility();
+    syncSm2KeyState();
+  }
+  if (tool.id === 'sm4') {
+    content.querySelector('#crypto-key')?.addEventListener('input', () => syncSecretLength('key'));
+    content.querySelector('#crypto-iv')?.addEventListener('input', () => syncSecretLength('iv'));
+    content.querySelector('#crypto-key-encoding')?.addEventListener('change', () => syncSecretLength('key'));
+    content.querySelector('#crypto-iv-encoding')?.addEventListener('change', () => syncSecretLength('iv'));
+    content.querySelectorAll('[data-crypto-random]').forEach((button) => button.addEventListener('click', () => {
+      const kind = button.dataset.cryptoRandom;
+      const info = secretFieldInfo[kind];
+      const inputNode = content.querySelector(info?.input);
+      const encodingNode = content.querySelector(info?.encoding);
+      if (!inputNode || !encodingNode) return;
+      inputNode.value = formatCryptoSecretRandom(encodingNode.value, 16);
+      inputNode.dispatchEvent(new Event('input', { bubbles: true }));
+      setStatus(`已生成随机${kind === 'key' ? '密钥' : 'IV'}`, 'success');
+    }));
+  }
   content.querySelectorAll('[data-tool-action]').forEach((button) => button.addEventListener('click', () => {
     if (button.dataset.toolAction === 'crypto-clear') { input.value = ''; output.textContent = ''; setStatus('等待执行'); return; }
     if (button.dataset.toolAction === 'copy-crypto-output') { copyText(output.textContent || '').then(() => showToast('结果已复制')); return; }
@@ -5149,6 +5764,7 @@ function bindCryptoWorkspace(tool) {
   }));
   syncModeOptions();
   syncInputHint();
+  syncSecretLengths();
   renderAlgorithmPicker();
   if (tool.id === 'sha2' || tool.id === 'sha3' || tool.id === 'sm3') execute();
   if (tool.capability !== 'ready' && tool.id !== 'sha2') renderUnavailable();
@@ -5189,6 +5805,7 @@ function bindWorkspace(tool) {
   if (tool.id === 'mermaid') { bindMermaidWorkspace(); return; }
   if (tool.id === 'markdown-image') { bindMarkdownImageWorkspace(); return; }
   if (tool.id === 'markdown-editor') { bindMarkdownEditorWorkspace(); return; }
+  if (tool.id === 'mindmap') { bindMindmapWorkspace(); return; }
   if (tool.id === 'image-tools') { bindImageToolsWorkspace(); return; }
   if (tool.id === 'qr-barcode') { bindQrBarcodeWorkspace(); return; }
   if (tool.id === 'favicon') { bindFaviconWorkspace(); return; }

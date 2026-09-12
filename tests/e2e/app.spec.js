@@ -4,7 +4,7 @@ import { PDFDocument } from 'pdf-lib';
 test('首页展示完整工具目录并支持搜索', async ({ page, isMobile }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '欢迎使用 ByeTools' })).toBeVisible();
-  await expect(page.locator('.tool-card')).toHaveCount(49);
+  await expect(page.locator('.tool-card')).toHaveCount(50);
   if (isMobile) {
     await page.keyboard.press('Control+k');
     await page.locator('#palette-input').fill('Base64');
@@ -80,6 +80,52 @@ test('Markdown 编辑器支持实时预览、本地文件打开和保存', async
   await page.locator('[data-markdown-editor-action="save"]').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('readme.md');
+});
+
+test('Markdown 编辑器支持编辑、源码、分栏和预览视图切换', async ({ page }) => {
+  await page.goto('/#/tool/markdown-editor');
+  const layout = page.locator('[data-markdown-editor-layout]');
+  await expect(layout).toHaveAttribute('data-markdown-view', 'split');
+  const headingPicker = page.locator('.markdown-editor-heading-select .bt-select');
+  await headingPicker.locator('[data-bt-select-toggle]').click();
+  await expect(headingPicker.locator('[data-bt-select-option]').first().locator('b')).toBeVisible();
+  await expect(headingPicker.locator('[data-bt-select-option]').first().locator('b')).toHaveText('Heading 1');
+  await headingPicker.locator('[data-bt-select-toggle]').click();
+  await page.locator('[data-markdown-editor-view="source"]').click();
+  await expect(layout).toHaveAttribute('data-markdown-view', 'source');
+  await expect(page.locator('#markdown-editor-input')).toBeVisible();
+  await expect(page.locator('#markdown-editor-preview')).toBeHidden();
+  await page.locator('#markdown-editor-input').fill('## 视图测试');
+  await page.locator('[data-markdown-editor-view="preview"]').click();
+  await expect(layout).toHaveAttribute('data-markdown-view', 'preview');
+  await expect(page.locator('#markdown-editor-preview h2')).toHaveText('视图测试');
+  await expect(page.locator('#markdown-editor-input')).toBeHidden();
+  await page.locator('[data-markdown-editor-view="edit"]').click();
+  await expect(layout).toHaveAttribute('data-markdown-view', 'edit');
+  await expect(page.locator('#markdown-editor-visual h2')).toHaveText('视图测试');
+  await page.locator('#markdown-editor-visual').fill('可视化编辑内容');
+  await expect(page.locator('#markdown-editor-input')).toHaveValue('## 可视化编辑内容');
+  await page.locator('[data-markdown-editor-view="split"]').click();
+  await expect(page.locator('#markdown-editor-preview')).toContainText('可视化编辑内容');
+});
+
+test('Markdown 编辑器工具栏支持常用块和行内语法', async ({ page }) => {
+  await page.goto('/#/tool/markdown-editor');
+  const input = page.locator('#markdown-editor-input');
+  await input.fill('~~删除~~\n\n![图片](https://example.com/image.png)');
+  await expect(page.locator('#markdown-editor-preview del')).toHaveText('删除');
+  await expect(page.locator('#markdown-editor-preview img')).toHaveAttribute('alt', '图片');
+  await input.fill('工具栏');
+  await page.locator('[data-markdown-editor-format="strike"]').click();
+  await expect(input).toHaveValue('工具栏~~文本~~');
+  await page.locator('[data-markdown-editor-format="table"]').click();
+  await expect(input).toHaveValue(/\| 项目 \| 说明 \|/);
+  await page.locator('[data-markdown-editor-format="code-block"]').click();
+  await expect(input).toHaveValue(/```text/);
+  await page.locator('[data-markdown-editor-format="math"]').click();
+  await expect(input).toHaveValue(/\$```text/);
+  await page.locator('[data-markdown-editor-format="hr"]').click();
+  await expect(input).toHaveValue(/---/);
 });
 
 test('图片裁剪支持可视化裁剪框、比例、形状和导出尺寸', async ({ page }) => {
@@ -182,7 +228,7 @@ test('所有工具均可打开且不会产生页面异常', async ({ page }) => 
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.goto('/');
   const toolIds = await page.locator('.tool-card').evaluateAll((cards) => cards.map((card) => card.dataset.toolId));
-  expect(toolIds).toHaveLength(49);
+  expect(toolIds).toHaveLength(50);
   for (const toolId of toolIds) {
     await test.step(`打开 ${toolId}`, async () => {
       await page.locator(`.tool-card[data-tool-id="${toolId}"]`).evaluate((card) => card.click());
@@ -191,6 +237,23 @@ test('所有工具均可打开且不会产生页面异常', async ({ page }) => 
     });
   }
   expect(pageErrors).toEqual([]);
+});
+
+test('思维导图支持模板切换、实时生成和导出', async ({ page }) => {
+  await page.goto('/#/tool/mindmap');
+  await expect(page.getByRole('heading', { name: '思维导图生成' })).toBeVisible();
+  await expect(page.locator('#mindmap-preview svg')).toBeVisible();
+  await expect(page.locator('#mindmap-preview svg text').filter({ hasText: '365 工具箱' })).toBeVisible();
+  await page.locator('[data-mindmap-template="architecture"]').click();
+  await expect(page.locator('#mindmap-input')).toHaveValue(/应用系统/);
+  await expect(page.locator('#mindmap-preview svg text').filter({ hasText: '应用系统' })).toBeVisible();
+  await page.locator('#mindmap-input').fill('# 项目\n\n## 目标\n- 完成 MVP');
+  await expect(page.locator('#mindmap-preview svg text').filter({ hasText: '完成 MVP' })).toBeVisible();
+  await page.locator('[data-mindmap-action="clear"]').click();
+  await expect(page.locator('#mindmap-preview svg text').filter({ hasText: '思维导图' })).toBeVisible();
+  const svgDownload = page.waitForEvent('download');
+  await page.locator('[data-mindmap-action="download-svg"]').click();
+  expect((await svgDownload).suggestedFilename()).toBe('byetools-mindmap.svg');
 });
 
 test('Unicode 与 AES 工具执行真实转换', async ({ page }) => {
@@ -247,6 +310,70 @@ test('SM2、SM3、SM4 工具执行真实国密运算', async ({ page }) => {
   expect(sm2Encrypted).toMatch(/^[A-Za-z0-9+/=]+$/);
   await page.locator('#crypto-key').fill('3ede63f46911ef86c71f04c554e7949a897452079a248d26a5225adc7b163ab9');
   await page.locator('#crypto-input').fill(sm2Encrypted);
+  await page.locator('[data-crypto-operation="decrypt"]').click();
+  await expect(page.locator('#crypto-output')).toHaveText('ByeTools');
+});
+
+test('SM2 支持生成密钥对、推导公钥和兼容密文格式', async ({ page }) => {
+  await page.goto('/#/tool/sm2');
+  await page.locator('[data-sm2-key-action="generate"]').click();
+  await expect(page.locator('#crypto-key')).toHaveValue(/^[0-9a-f]{130}$/i);
+  await expect(page.locator('#crypto-private-key')).toHaveValue(/^[0-9a-f]{64}$/i);
+  await expect(page.locator('#crypto-sm2-public-status')).toHaveText('公钥合法 ✓');
+  await expect(page.locator('#crypto-sm2-private-status')).toHaveText('私钥合法 ✓');
+
+  const publicKey = await page.locator('#crypto-key').inputValue();
+  const privateKey = await page.locator('#crypto-private-key').inputValue();
+  await page.locator('#crypto-key').fill('');
+  await page.locator('[data-sm2-key-action="derive"]').click();
+  await expect(page.locator('#crypto-key')).toHaveValue(publicKey);
+
+  const roundTrip = async (text) => {
+    await page.locator('#crypto-input').fill(text);
+    await page.locator('[data-crypto-operation="encrypt"]').click();
+    const encrypted = await page.locator('#crypto-output').textContent();
+    await page.locator('#crypto-input').fill(encrypted);
+    await page.locator('[data-crypto-operation="decrypt"]').click();
+    await expect(page.locator('#crypto-output')).toHaveText(text);
+  };
+  await roundTrip('SM2 密钥对');
+
+  await page.locator('#sm2-cipher-prefix').check();
+  await roundTrip('04 前缀');
+  await page.locator('#sm2-cipher-prefix').uncheck();
+  await page.locator('#sm2-cipher-der').check();
+  await roundTrip('ASN.1 DER');
+  await page.locator('#sm2-cipher-der').uncheck();
+  await page.locator('#sm2-cipher-mode').selectOption('0');
+  await roundTrip('C1C2C3');
+  await expect(page.locator('#crypto-private-key')).toHaveValue(privateKey);
+});
+
+test('SM4 密钥和 IV 默认 UTF-8 并支持编码切换与随机生成', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="sm4"]').click();
+  await expect(page.locator('#crypto-key-encoding')).toHaveValue('utf8');
+  await expect(page.locator('#crypto-iv-encoding')).toHaveValue('utf8');
+
+  await page.locator('[data-crypto-random="key"]').click();
+  await page.locator('[data-crypto-random="iv"]').click();
+  await expect(page.locator('#crypto-key')).toHaveValue(/^[A-Za-z0-9]{16}$/);
+  await expect(page.locator('#crypto-iv')).toHaveValue(/^[A-Za-z0-9]{16}$/);
+  await expect(page.locator('#crypto-key-length')).toHaveText('16 字节 ✓');
+  await expect(page.locator('#crypto-iv-length')).toHaveText('16 字节 ✓');
+
+  await page.locator('#crypto-key-encoding').selectOption('hex');
+  await page.locator('#crypto-iv-encoding').selectOption('base64');
+  await page.locator('#crypto-key').fill('00112233445566778899aabbccddeeff');
+  await page.locator('#crypto-iv').fill('AAECAwQFBgcICQoLDA0ODw==');
+  await expect(page.locator('#crypto-key-length')).toHaveText('16 字节 ✓');
+  await expect(page.locator('#crypto-iv-length')).toHaveText('16 字节 ✓');
+
+  await page.locator('#crypto-input').fill('ByeTools');
+  await page.locator('[data-crypto-operation="encrypt"]').click();
+  const encrypted = await page.locator('#crypto-output').textContent();
+  expect(encrypted).toMatch(/^[A-Za-z0-9+/=]+$/);
+  await page.locator('#crypto-input').fill(encrypted);
   await page.locator('[data-crypto-operation="decrypt"]').click();
   await expect(page.locator('#crypto-output')).toHaveText('ByeTools');
 });
