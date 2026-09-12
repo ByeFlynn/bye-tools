@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { PDFDocument } from 'pdf-lib';
 
 test('首页展示完整工具目录并支持搜索', async ({ page, isMobile }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '欢迎使用 ByeTools' })).toBeVisible();
-  await expect(page.locator('.tool-card')).toHaveCount(44);
+  await expect(page.locator('.tool-card')).toHaveCount(49);
   if (isMobile) {
     await page.keyboard.press('Control+k');
     await page.locator('#palette-input').fill('Base64');
@@ -19,6 +20,118 @@ test('URL 和 HTML 工具卡片显示正确图标', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.tool-card[data-tool-id="url"] .tool-icon')).toHaveText('URL');
   await expect(page.locator('.tool-card[data-tool-id="html"] .tool-icon')).toHaveText('</>');
+});
+
+const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+
+test('图片工具支持 Base64 还原和模式切换', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="image-tools"]').click();
+  await expect(page.getByRole('heading', { name: '图片工具' })).toBeVisible();
+  await page.locator('[data-file-mode="base64"]').click();
+  await page.locator('#image-base64-direction').selectOption('base64-to-image');
+  await page.locator('#image-base64-input').fill(onePixelPng.toString('base64'));
+  await page.locator('[data-file-action="image-process"]').click();
+  await expect(page.locator('#image-result-stage img')).toBeVisible();
+  await expect(page.locator('#image-result-caption')).toContainText('Base64 已还原');
+  await page.locator('[data-file-mode="resize"]').click();
+  await expect(page.locator('#image-width')).toBeVisible();
+  await expect(page.locator('#image-height')).toBeVisible();
+});
+
+test('二维码与条形码工作台支持四种模式', async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="qr-barcode"]').click();
+  await expect(page.getByRole('heading', { name: '二维码与条形码' })).toBeVisible();
+  await page.locator('#qrbc-qr-text').fill('ByeTools QR');
+  await page.locator('[data-qrbc-action="generate"]').click();
+  await expect(page.locator('.qrbc-generated-image')).toBeVisible();
+  await expect(page.locator('[data-qrbc-action="download"]')).toBeEnabled();
+  const qrDataUrl = await page.locator('.qrbc-generated-image').getAttribute('src');
+  const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+  await page.locator('[data-file-mode="qr-recognize"]').click();
+  await page.locator('#qrbc-file-input').setInputFiles({ name: 'qrcode.png', mimeType: 'image/png', buffer: qrBuffer });
+  await page.locator('[data-qrbc-action="recognize"]').click();
+  await expect(page.locator('#qrbc-recognized-text')).toHaveValue('ByeTools QR', { timeout: 15_000 });
+  await page.locator('[data-file-mode="barcode-generate"]').click();
+  await page.locator('#qrbc-barcode-text').fill('BYETOOLS-2026');
+  await page.locator('[data-qrbc-action="generate"]').click();
+  await expect(page.locator('.qrbc-barcode-canvas canvas')).toBeVisible();
+  const barcodeDataUrl = await page.locator('.qrbc-barcode-canvas canvas').evaluate((canvas) => canvas.toDataURL('image/png'));
+  const barcodeBuffer = Buffer.from(barcodeDataUrl.split(',')[1], 'base64');
+  await page.locator('[data-file-mode="barcode-recognize"]').click();
+  await page.locator('#qrbc-file-input').setInputFiles({ name: 'barcode.png', mimeType: 'image/png', buffer: barcodeBuffer });
+  await page.locator('[data-qrbc-action="recognize"]').click();
+  await expect(page.locator('#qrbc-recognized-text')).toHaveValue('BYETOOLS-2026', { timeout: 15_000 });
+});
+
+test('Markdown 编辑器支持实时预览、本地文件打开和保存', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="markdown-editor"]').click();
+  await expect(page.getByRole('heading', { name: 'Markdown 编辑器' })).toBeVisible();
+  await page.locator('#markdown-editor-input').fill('# 本地文档\n\n**继续编辑**');
+  await expect(page.locator('#markdown-editor-preview h1')).toHaveText('本地文档');
+  await expect(page.locator('#markdown-editor-preview strong')).toHaveText('继续编辑');
+  await page.locator('#markdown-editor-file-input').setInputFiles({ name: 'readme.md', mimeType: 'text/markdown', buffer: Buffer.from('## 已打开文件\n\n- 第一行\n- 第二行', 'utf8') });
+  await expect(page.locator('#markdown-editor-input')).toHaveValue(/已打开文件/);
+  await expect(page.locator('#markdown-editor-filename')).toHaveValue('readme.md');
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('[data-markdown-editor-action="save"]').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('readme.md');
+});
+
+test('图片裁剪支持可视化裁剪框、比例、形状和导出尺寸', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="image-tools"]').click();
+  await page.locator('[data-file-mode="crop"]').click();
+  await page.locator('#image-file-input').setInputFiles({ name: 'crop.png', mimeType: 'image/png', buffer: onePixelPng });
+  await expect(page.locator('#image-crop-editor')).toBeVisible();
+  await page.locator('[data-crop-aspect="1:1"]').click();
+  await expect(page.locator('#image-crop-ratio-label')).toHaveText('1:1');
+  const frame = page.locator('#image-crop-frame');
+  await frame.focus();
+  const beforeX = await page.locator('#image-crop-x').inputValue();
+  await page.keyboard.press('ArrowRight');
+  expect(Number(await page.locator('#image-crop-x').inputValue())).toBeGreaterThanOrEqual(Number(beforeX));
+  await page.locator('[data-crop-shape="circle"]').click();
+  await page.locator('#image-crop-angle').fill('45');
+  await page.locator('[data-crop-output="128"]').click();
+  await page.locator('[data-file-action="image-process"]').click();
+  await expect(page.locator('#image-result-stage img')).toBeVisible();
+  await expect(page.locator('#image-result-caption')).toContainText('128 ×');
+});
+
+test('Favicon 生成器输出 PNG 套件和 HTML 片段', async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="favicon"]').click();
+  await page.locator('#favicon-file-input').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: onePixelPng });
+  await expect(page.locator('#favicon-status')).toHaveText('图片已就绪');
+  await page.locator('[data-file-action="favicon-generate"]').click();
+  await expect(page.locator('.favicon-result-item')).toHaveCount(6, { timeout: 15_000 });
+  await expect(page.locator('#favicon-snippet')).toHaveValue(/favicon\.ico/);
+  await expect(page.locator('[data-file-action="favicon-download-ico"]')).toBeEnabled();
+});
+
+test('PDF 工具支持多文件合并和页面模式切换', async ({ page }) => {
+  const first = await PDFDocument.create();
+  first.addPage([240, 320]);
+  const second = await PDFDocument.create();
+  second.addPage([240, 320]);
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="pdf-tools"]').click();
+  await page.locator('#pdf-file-input').setInputFiles([
+    { name: 'first.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await first.save()) },
+    { name: 'second.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await second.save()) },
+  ]);
+  await expect(page.locator('.pdf-file-item')).toHaveCount(2);
+  await page.locator('[data-file-action="pdf-process"]').click();
+  await expect(page.locator('#pdf-result-caption')).toContainText('2 个文件');
+  await expect(page.locator('.pdf-result-item')).toHaveCount(1);
+  await page.locator('[data-file-mode="watermark"]').click();
+  await expect(page.locator('#pdf-watermark-text')).toBeVisible();
 });
 
 test('Base64 工作台可编码和解码', async ({ page }) => {
@@ -69,7 +182,7 @@ test('所有工具均可打开且不会产生页面异常', async ({ page }) => 
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.goto('/');
   const toolIds = await page.locator('.tool-card').evaluateAll((cards) => cards.map((card) => card.dataset.toolId));
-  expect(toolIds).toHaveLength(44);
+  expect(toolIds).toHaveLength(49);
   for (const toolId of toolIds) {
     await test.step(`打开 ${toolId}`, async () => {
       await page.locator(`.tool-card[data-tool-id="${toolId}"]`).evaluate((card) => card.click());

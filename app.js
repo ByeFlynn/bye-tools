@@ -1,11 +1,20 @@
 import smCrypto from 'sm-crypto';
 import { sha3_256, sha3_384, sha3_512 } from 'js-sha3';
+import { PDFDocument, rgb, degrees } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import QRCode from 'qrcode';
+import bwipjs from 'bwip-js/browser';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const { sm2: sm2Library, sm3: sm3Library, sm4: sm4Library } = smCrypto;
 
 const tools = [
   { id: 'json', name: 'JSON 格式化', description: '格式化、验证和美化 JSON 数据', category: 'data-format', label: 'JSON 工具', icon: '{ }', iconClass: 'icon-json', environment: 'local', featured: true, keywords: 'json 格式化 校验 美化 树 编辑 lint 解码' },
   { id: 'base64', name: 'Base64 编解码', description: 'Base64 编码与解码', category: 'encoding', label: '编码转换', icon: '64', iconClass: 'icon-base64', environment: 'local', featured: true, keywords: 'base64 编码 解码' },
+  { id: 'qr-barcode', name: '二维码与条形码', description: '二维码和条形码的生成与图片识别', category: 'encoding', label: '编码转换', icon: 'QR', iconClass: 'icon-qr-barcode', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: '二维码 qr code 生成 识别 条形码 barcode 生成器 识别器' },
   { id: 'time', name: '时间戳转换', description: '时间戳、日期时间和时长单位互转', category: 'helper', label: '开发辅助', icon: '◷', iconClass: 'icon-time', environment: 'local', featured: true, keywords: '时间戳 日期 时间 时区 秒 毫秒 分 时 天 周 月 年' },
   { id: 'url', name: 'URL 编解码', description: 'URL 编码与解码', category: 'encoding', label: '编码转换', icon: 'URL', iconClass: 'icon-url', environment: 'local', featured: true, keywords: 'url 编码 解码' },
   { id: 'md5', name: 'MD5 摘要', description: 'MD5 摘要生成（不推荐安全用途）', category: 'crypto', label: '加密解密', icon: '▣', iconClass: 'icon-md5', environment: 'local', cryptoType: 'digest', capability: 'deprecated', capabilityLabel: '不推荐', keywords: 'md5 hash 摘要 弱算法' },
@@ -27,6 +36,10 @@ const tools = [
   { id: 'diff', name: '文本对比', description: '文本、JSON 和 Properties 差异', category: 'text', label: '文本工具', icon: '≠', iconClass: 'icon-diff', environment: 'local', keywords: 'diff 文本 对比 json properties' },
   { id: 'mermaid', name: 'Mermaid 图表', description: 'Mermaid 代码生成 SVG 图表', category: 'format', label: '格式化工具', icon: '◇', iconClass: 'icon-mermaid', environment: 'local', keywords: 'mermaid 图表 流程图 svg' },
   { id: 'markdown-image', name: 'Markdown 转图片', description: '主题排版与 PNG 导出', category: 'format', label: '格式化工具', icon: 'M↓', iconClass: 'icon-html', environment: 'local', keywords: 'markdown 图片 png 主题' },
+  { id: 'markdown-editor', name: 'Markdown 编辑器', description: '编辑、预览并保存 Markdown 文档', category: 'format', label: '格式化工具', icon: 'MD', iconClass: 'icon-markdown-editor', environment: 'local', capability: 'ready', capabilityLabel: '本地编辑', keywords: 'markdown 编辑器 编辑 预览 文档 md 打开 保存 文件' },
+  { id: 'image-tools', name: '图片工具', description: '压缩、缩放、裁剪、格式转换和 Base64 互转', category: 'file', label: '文件工具', icon: 'IMG', iconClass: 'icon-image-tools', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: '图片 压缩 尺寸 缩放 裁剪 格式 png jpg jpeg webp avif base64' },
+  { id: 'favicon', name: 'Favicon 生成器', description: '从一张图片生成网站图标和常用尺寸 PNG', category: 'file', label: '文件工具', icon: '★', iconClass: 'icon-favicon', environment: 'local', capability: 'ready', capabilityLabel: '本地生成', keywords: 'favicon 网站图标 ico png apple touch icon manifest' },
+  { id: 'pdf-tools', name: 'PDF 工具', description: '合并、拆分、加水印、整理和转图片', category: 'file', label: '文件工具', icon: 'PDF', iconClass: 'icon-pdf-tools', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: 'pdf 合并 拆分 水印 整理 页面重排 转图片 png' },
   { id: 'jwt', name: 'JWT 解析', description: '解析 Header、Payload 和时间字段', category: 'helper', label: '开发辅助', icon: 'JWT', iconClass: 'icon-sha', environment: 'local', keywords: 'jwt token header payload' },
   { id: 'curl', name: 'Curl 转代码', description: 'Curl 转 Fetch、Axios、Python、Go', category: 'network', label: '网络工具', icon: '↯', iconClass: 'icon-random', environment: 'local', keywords: 'curl fetch axios python go' },
   { id: 'cron', name: 'Cron 表达式', description: '校验表达式与预览执行时间', category: 'helper', label: '开发辅助', icon: '⏱', iconClass: 'icon-time', environment: 'local', keywords: 'cron 定时 任务 表达式' },
@@ -228,6 +241,11 @@ const workspaceTemplates = {
   html: htmlWorkbenchMarkup,
   mermaid: mermaidWorkbenchMarkup,
   'markdown-image': markdownImageWorkbenchMarkup,
+  'markdown-editor': markdownEditorWorkbenchMarkup,
+  'image-tools': imageToolsWorkbenchMarkup,
+  'qr-barcode': qrBarcodeWorkbenchMarkup,
+  favicon: faviconWorkbenchMarkup,
+  'pdf-tools': pdfToolsWorkbenchMarkup,
   diff: diffWorkbenchMarkup,
   cron: cronWorkbenchMarkup,
   md5: (tool) => cryptoWorkbenchMarkup(tool),
@@ -1116,6 +1134,18 @@ function markdownImageWorkbenchMarkup() {
 - JSON 格式化
 - Curl 转代码
 - Cron 表达式</textarea><div class="workspace-card-foot"><span id="markdown-status">实时排版</span><span>本地生成</span></div></section><section class="workspace-card markdown-preview-card"><div class="workspace-card-head"><div><strong>图片预览</strong><small>导出时保留当前主题与字号</small></div><span class="code-badge">PNG</span></div><div class="markdown-preview" id="markdown-preview"></div></section></div>
+  </div>`;
+}
+
+function markdownEditorWorkbenchMarkup() {
+  return `<div class="special-workbench markdown-editor-workbench">
+    <div class="markdown-editor-toolbar">
+      <div class="markdown-editor-file-actions"><input class="file-native-input" id="markdown-editor-file-input" type="file" accept=".md,.markdown,.mdown,.mkdn,.txt,text/markdown,text/plain" /><label class="markdown-editor-open" for="markdown-editor-file-input" title="打开本地 Markdown 文件"><span aria-hidden="true">↥</span>打开文件</label><label class="markdown-editor-filename"><span>文件名</span><input id="markdown-editor-filename" type="text" value="untitled.md" spellcheck="false" /></label></div>
+      <div class="markdown-editor-view-switch" role="tablist" aria-label="编辑器视图"><button class="markdown-editor-view is-active" type="button" role="tab" aria-selected="true" data-markdown-editor-view="edit"><span aria-hidden="true">T</span>编辑</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="source"><span aria-hidden="true">&lt;/&gt;</span>源码</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="split"><span aria-hidden="true">▣</span>分栏</button><button class="markdown-editor-view" type="button" role="tab" aria-selected="false" data-markdown-editor-view="preview"><span aria-hidden="true">◉</span>预览</button></div>
+      <div class="markdown-editor-actions"><button class="secondary-button" type="button" data-markdown-editor-action="new" title="新建文档">＋ 新建</button><button class="secondary-button" type="button" data-markdown-editor-action="copy-markdown" title="复制 Markdown 源码">▣ 复制</button><button class="secondary-button" type="button" data-markdown-editor-action="fullscreen" title="进入全屏">↗ 全屏</button><button class="primary-button" type="button" data-markdown-editor-action="save" title="保存 Markdown 文件">↓ 保存</button><span class="markdown-editor-status" id="markdown-editor-status">本地草稿</span></div>
+    </div>
+    <div class="markdown-editor-formatbar" role="toolbar" aria-label="Markdown 格式工具栏"><label class="markdown-editor-heading-select"><span class="sr-only">标题级别</span><select id="markdown-editor-heading" aria-label="标题级别"><option value="1">Heading 1</option><option value="2">Heading 2</option><option value="3" selected>Heading 3</option><option value="4">Heading 4</option><option value="5">Heading 5</option><option value="6">Heading 6</option></select></label><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="bold" title="粗体"><b>B</b></button><button type="button" data-markdown-editor-format="italic" title="斜体"><i>I</i></button><button type="button" data-markdown-editor-format="strike" title="删除线"><s>S</s></button><button type="button" data-markdown-editor-format="code" title="行内代码">&lt;/&gt;</button><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="unordered" title="无序列表">•</button><button type="button" data-markdown-editor-format="ordered" title="有序列表">1.</button><button type="button" data-markdown-editor-format="task" title="任务列表">☑</button><button type="button" data-markdown-editor-format="quote" title="引用">❯</button><span class="markdown-editor-divider" aria-hidden="true"></span><button type="button" data-markdown-editor-format="link" title="链接">↗</button><button type="button" data-markdown-editor-format="image" title="图片">▧</button><button type="button" data-markdown-editor-format="table" title="表格">▦</button><button type="button" data-markdown-editor-format="code-block" title="代码块">[ ]</button><button type="button" data-markdown-editor-format="math" title="公式">Σ</button><button type="button" data-markdown-editor-format="hr" title="分隔线">—</button><span class="markdown-editor-toolbar-hint">Markdown · 本地编辑</span></div>
+    <div class="markdown-editor-layout" data-markdown-editor-layout data-markdown-view="split"><section class="workspace-card markdown-editor-input-card" data-markdown-editor-pane="source"><div class="workspace-card-head"><div><strong>源码编辑</strong><small>标准 Markdown 源码，输入时实时同步预览</small></div><span class="code-badge">MD</span></div><div class="markdown-editor-edit-shell"><div class="markdown-editor-line-numbers" id="markdown-editor-line-numbers" aria-hidden="true">1</div><textarea id="markdown-editor-input" spellcheck="false" wrap="off" aria-label="Markdown 编辑区"># ByeTools Markdown\n\n在这里编辑 Markdown 文档，右侧会实时显示预览。\n\n## 常用语法\n\n- 支持标题、列表和引用\n- 支持 **粗体**、*斜体* 和 \`行内代码\`\n\n> 所有内容只在当前设备处理。</textarea></div><div class="workspace-card-foot"><span id="markdown-editor-count">0 字符 · 0 行</span><button class="text-button" type="button" data-markdown-editor-action="clear">清空</button></div></section><section class="workspace-card markdown-editor-visual-card" data-markdown-editor-pane="visual"><div class="workspace-card-head"><div><strong>编辑</strong><small>所见即所得编辑，格式会同步为 Markdown</small></div><span class="code-badge">EDIT</span></div><div class="markdown-editor-visual" id="markdown-editor-visual" contenteditable="true" role="textbox" aria-label="Markdown 可视化编辑区" spellcheck="false"></div><div class="workspace-card-foot"><span>可视化编辑</span><span>自动同步源码</span></div></section><section class="workspace-card markdown-editor-preview-card" data-markdown-editor-pane="preview"><div class="workspace-card-head"><div><strong>实时预览</strong><small>渲染后的 Markdown 文档</small></div><div class="markdown-preview-actions"><span class="code-badge">PREVIEW</span><button class="text-button" type="button" data-markdown-editor-action="copy-html">复制 HTML</button></div></div><div class="markdown-editor-preview" id="markdown-editor-preview"></div><div class="workspace-card-foot"><span>本地渲染</span><span id="markdown-editor-preview-meta">实时更新</span></div></section></div>
   </div>`;
 }
 
@@ -2117,13 +2147,46 @@ function bindMermaidWorkspace() {
 }
 
 function renderMarkdown(value) {
-  let html = escapeHtml(value);
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  const codeBlocks = [];
+  const tableBlocks = [];
+  const token = (type, index) => `\uE000${type}${index}\uE001`;
+  let html = escapeHtml(String(value ?? '').replace(/\r\n?/g, '\n'));
+  html = html.replace(/^```(?:([\w+-]+))?\n([\s\S]*?)^```\s*$/gm, (_, language, code) => {
+    const index = codeBlocks.push(`<pre><code${language ? ` data-language="${escapeHtml(language)}"` : ''}>${code.replace(/\n$/, '')}</code></pre>`) - 1;
+    return token('code', index);
+  });
+  const sourceLines = html.split('\n');
+  const renderedLines = [];
+  const splitTableRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+  const isTableDivider = (line) => /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+  for (let index = 0; index < sourceLines.length; index += 1) {
+    const header = sourceLines[index];
+    if (header.includes('|') && isTableDivider(sourceLines[index + 1] || '')) {
+      const rows = [splitTableRow(header)];
+      index += 2;
+      while (index < sourceLines.length && sourceLines[index].includes('|') && sourceLines[index].trim()) { rows.push(splitTableRow(sourceLines[index])); index += 1; }
+      const columns = Math.max(...rows.map((row) => row.length));
+      const cells = (row, tag) => Array.from({ length: columns }, (_, cellIndex) => `<${tag}>${row[cellIndex] || ''}</${tag}>`).join('');
+      const indexToken = tableBlocks.push(`<table><thead><tr>${cells(rows[0], 'th')}</tr></thead><tbody>${rows.slice(1).map((row) => `<tr>${cells(row, 'td')}</tr>`).join('')}</tbody></table>`) - 1;
+      renderedLines.push(token('table', indexToken));
+      index -= 1;
+    } else renderedLines.push(header);
+  }
+  html = renderedLines.join('\n');
+  html = html.replace(/^###### (.+)$/gm, '<h6>$1</h6>').replace(/^##### (.+)$/gm, '<h5>$1</h5>').replace(/^#### (.+)$/gm, '<h4>$1</h4>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/((?:^&gt; ?.+(?:\n|$))+)/gm, (block) => `<blockquote>${block.split('\n').filter(Boolean).map((line) => line.replace(/^&gt; ?/, '')).join('<br />')}</blockquote>`);
+  html = html.replace(/^[-*] \[([ xX])\] (.+)$/gm, (_, checked, text) => `<li class="markdown-task"><input type="checkbox" ${checked.toLowerCase() === 'x' ? 'checked ' : ''}disabled>${text}</li>`);
   html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, (list) => `<ul>${list}</ul>`);
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
-  html = html.split(/\n{2,}/).map((block) => /^<(?:h[1-3]|ul)>/.test(block) ? block : `<p>${block.replace(/\n/g, '<br />')}</p>`).join('');
-  return html;
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<li data-ordered="true">$2</li>');
+  html = html.replace(/((?:<li(?: class="markdown-task")?>.*<\/li>\n?)+)/g, (list) => `<ul>${list}</ul>`);
+  html = html.replace(/((?:<li data-ordered="true">.*<\/li>\n?)+)/g, (list) => `<ol>${list.replace(/ data-ordered="true"/g, '')}</ol>`);
+  html = html.replace(/^---+$/gm, '<hr />');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/~~(.+?)~~/g, '<del>$1</del>').replace(/\*([^*\n]+)\*/g, '<em>$1</em>').replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+  html = html.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+|data:image\/[a-z0-9.+-]+;base64,[^\s)]+)\)/gi, '<img src="$2" alt="$1" loading="lazy" />');
+  html = html.replace(/\$\$([^$\n]+)\$\$/g, (_, formula) => `<div class="markdown-math-block">$$${formula}$$</div>`).replace(/\$([^$\n]+)\$/g, (_, formula) => `<span class="markdown-math">$${formula}$</span>`);
+  html = html.split(/\n{2,}/).map((block) => /^(?:<(?:h[1-6]|ul|ol|blockquote|pre|hr|table|div class="markdown-math-block")|\uE000)/.test(block) ? block : `<p>${block.replace(/\n/g, '<br />')}</p>`).join('');
+  return html.replace(/\uE000code(\d+)\uE001/g, (_, index) => codeBlocks[Number(index)] || '').replace(/\uE000table(\d+)\uE001/g, (_, index) => tableBlocks[Number(index)] || '');
 }
 
 function markdownThemeColors(theme) {
@@ -2176,6 +2239,1303 @@ function bindMarkdownImageWorkspace() {
   render();
 }
 
+function markdownEditorSafeFilename(value) {
+  const normalized = String(value || '').trim().replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ');
+  if (!normalized) return 'untitled.md';
+  return normalized.toLowerCase().endsWith('.md') || normalized.toLowerCase().endsWith('.markdown') ? normalized : `${normalized}.md`;
+}
+
+function bindMarkdownEditorWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const input = content.querySelector('#markdown-editor-input');
+  const preview = content.querySelector('#markdown-editor-preview');
+  const lineNumbers = content.querySelector('#markdown-editor-line-numbers');
+  const count = content.querySelector('#markdown-editor-count');
+  const fileInput = content.querySelector('#markdown-editor-file-input');
+  const filename = content.querySelector('#markdown-editor-filename');
+  const status = content.querySelector('#markdown-editor-status');
+  const previewMeta = content.querySelector('#markdown-editor-preview-meta');
+  let draftTimer = null;
+  let dirty = false;
+  let userInteracted = false;
+  let loadToken = 0;
+  const setStatus = (value, stateClass = '') => { status.textContent = value; status.className = `markdown-editor-status ${stateClass}`.trim(); };
+  const updateLineNumbers = () => {
+    const lines = input.value.split(/\r?\n/).length;
+    lineNumbers.textContent = Array.from({ length: lines }, (_, index) => index + 1).join('\n');
+    count.textContent = `${input.value.length} 字符 · ${lines} 行`;
+  };
+  const render = () => {
+    preview.innerHTML = renderMarkdown(input.value);
+    updateLineNumbers();
+    previewMeta.textContent = `${input.value.length} 字符 · 实时更新`;
+  };
+  const persistDraft = () => {
+    if (!storage) return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => storage.setDraft('markdown-editor', { draft: input.value, filename: markdownEditorSafeFilename(filename.value) }).catch(() => {}), 180);
+  };
+  const markDirty = () => {
+    userInteracted = true;
+    dirty = true;
+    setStatus('有未保存修改', 'is-warning');
+    render();
+    persistDraft();
+  };
+  const applyText = (value, name = filename.value, sourceLabel = '') => {
+    input.value = String(value ?? '');
+    filename.value = markdownEditorSafeFilename(name);
+    dirty = false;
+    render();
+    setStatus(sourceLabel ? `已打开 · ${sourceLabel}` : '本地草稿', 'is-success');
+    persistDraft();
+  };
+  const insertFormat = (format) => {
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const selected = input.value.slice(start, end) || (format === 'link' ? '链接文字' : '文本');
+    const wrappers = { bold: ['**', '**'], italic: ['*', '*'], code: ['`', '`'], link: ['[', '](https://example.com)'] };
+    let replacement = '';
+    if (format === 'heading') replacement = selected.split('\n').map((line) => `## ${line.replace(/^#{1,6}\s*/, '')}`).join('\n');
+    else if (format === 'unordered') replacement = selected.split('\n').map((line) => `- ${line.replace(/^[-*]\s*/, '')}`).join('\n');
+    else if (format === 'ordered') replacement = selected.split('\n').map((line, index) => `${index + 1}. ${line.replace(/^\d+\.\s*/, '')}`).join('\n');
+    else if (format === 'quote') replacement = selected.split('\n').map((line) => `> ${line.replace(/^>\s?/, '')}`).join('\n');
+    else replacement = `${wrappers[format][0]}${selected}${wrappers[format][1]}`;
+    input.setRangeText(replacement, start, end, 'select');
+    input.focus();
+    markDirty();
+  };
+  const save = () => {
+    const name = markdownEditorSafeFilename(filename.value);
+    filename.value = name;
+    downloadTextFile(input.value, name, 'text/markdown;charset=utf-8');
+    dirty = false;
+    setStatus(`已保存 · ${name}`, 'is-success');
+    persistDraft();
+    showToast(`Markdown 文件已保存：${name}`);
+  };
+  const openFile = async (file) => {
+    if (!file) return;
+    userInteracted = true;
+    const token = ++loadToken;
+    try {
+      const text = await file.text();
+      if (token !== loadToken) return;
+      applyText(text, file.name, file.name);
+      setStatus(`已打开 · ${file.name}`, 'is-success');
+    } catch (error) {
+      setStatus(`打开失败：${error.message}`, 'is-error');
+      showToast(`Markdown 文件打开失败：${error.message}`);
+    }
+  };
+  const restoreDraft = async () => {
+    if (!storage) return;
+    try {
+      const record = await storage.getDraft('markdown-editor');
+      const payload = record?.payload;
+      if (!userInteracted && payload && typeof payload === 'object' && typeof payload.draft === 'string' && payload.draft) applyText(payload.draft, payload.filename || 'untitled.md');
+    } catch (error) {
+      setStatus('本地草稿读取失败', 'is-error');
+    }
+  };
+  input.addEventListener('input', markDirty);
+  input.addEventListener('scroll', () => { lineNumbers.scrollTop = input.scrollTop; });
+  filename.addEventListener('change', () => { userInteracted = true; filename.value = markdownEditorSafeFilename(filename.value); if (dirty) setStatus('有未保存修改', 'is-warning'); });
+  fileInput.addEventListener('change', () => { openFile(fileInput.files?.[0]); fileInput.value = ''; });
+  content.addEventListener('click', (event) => {
+    const format = event.target.closest('[data-markdown-editor-format]')?.dataset.markdownEditorFormat;
+    if (format) { insertFormat(format); return; }
+    const action = event.target.closest('[data-markdown-editor-action]')?.dataset.markdownEditorAction;
+    if (!action) return;
+    if (action === 'save') save();
+    if (action === 'copy-html') copyText(preview.innerHTML).then(() => showToast('预览 HTML 已复制'));
+    if (action === 'clear') { userInteracted = true; input.value = ''; dirty = true; render(); setStatus('有未保存修改', 'is-warning'); persistDraft(); input.focus(); }
+    if (action === 'new') { userInteracted = true; input.value = ''; filename.value = 'untitled.md'; dirty = true; render(); setStatus('新建文档', 'is-warning'); persistDraft(); input.focus(); }
+  });
+  content.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); save(); }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); fileInput.click(); }
+  });
+  render();
+  restoreDraft();
+  activeWorkspaceCleanup = () => { clearTimeout(draftTimer); loadToken += 1; };
+}
+
+const imageToolModes = [
+  ['compress', '图片压缩', '按质量减小体积'],
+  ['resize', '尺寸调整', '按像素缩放图片'],
+  ['crop', '图片裁剪', '精确裁剪图片区域'],
+  ['format', '格式转换', 'PNG、JPEG、WebP 互转'],
+  ['base64', 'Base64 互转', '图片与文本双向转换'],
+];
+
+const imageCropAspectPresets = [
+  ['free', '自由', null],
+  ['original', '原始', 'original'],
+  ['1:1', '1:1', 1],
+  ['4:3', '4:3', 4 / 3],
+  ['3:4', '3:4', 3 / 4],
+  ['16:9', '16:9', 16 / 9],
+  ['9:16', '9:16', 9 / 16],
+  ['3:2', '3:2', 3 / 2],
+  ['2:3', '2:3', 2 / 3],
+  ['custom', '自定义', 'custom'],
+];
+
+const imageCropShapes = [
+  ['rectangle', '矩形', '□'],
+  ['rounded', '圆角', '▢'],
+  ['circle', '圆形', '○'],
+  ['oval', '椭圆', '⬭'],
+  ['triangle', '三角形', '△'],
+  ['diamond', '菱形', '◇'],
+  ['pentagon', '五边形', '⬠'],
+  ['hexagon', '六边形', '⬡'],
+  ['star', '五角星', '☆'],
+  ['heart', '心形', '♡'],
+];
+
+function fileModeTabsMarkup(id, modes, active) {
+  return `<div class="file-mode-tabs" id="${id}" role="tablist">${modes.map(([value, label, hint], index) => `<button class="file-mode-tab ${value === active ? 'is-active' : ''}" type="button" role="tab" aria-selected="${value === active}" data-file-mode="${value}"><b>${label}</b><small>${hint}</small></button>`).join('')}</div>`;
+}
+
+function fileDropzoneMarkup(inputId, dropzoneId, acceptText) {
+  return `<input class="file-native-input" id="${inputId}" type="file" accept="${acceptText}" /><label class="file-dropzone" id="${dropzoneId}" for="${inputId}"><span class="file-dropzone-icon">＋</span><strong>选择文件或拖拽到这里</strong><small>文件只在当前设备处理，不会上传</small></label>`;
+}
+
+const qrBarcodeModes = [
+  ['qr-generate', '二维码生成', '文本生成二维码'],
+  ['qr-recognize', '二维码识别', '从图片读取二维码'],
+  ['barcode-generate', '条形码生成', '生成常用一维码'],
+  ['barcode-recognize', '条形码识别', '从图片读取条形码'],
+];
+
+function qrBarcodeWorkbenchMarkup() {
+  return `<div class="file-workbench qr-barcode-workbench">
+    ${fileModeTabsMarkup('qr-barcode-mode-tabs', qrBarcodeModes, 'qr-generate')}
+    <div class="qr-barcode-layout">
+      <section class="workspace-card qr-barcode-config-card"><div class="workspace-card-head"><div><strong id="qrbc-config-title">二维码内容</strong><small id="qrbc-config-caption">输入文本后生成二维码图片</small></div><span class="code-badge" id="qrbc-config-badge">QR CODE</span></div><div class="file-settings" id="qrbc-settings"></div><div class="file-action-row" id="qrbc-actions"></div></section>
+      <section class="workspace-card qr-barcode-preview-card"><div class="workspace-card-head"><div><strong id="qrbc-result-title">二维码预览</strong><small id="qrbc-result-caption">生成结果会显示在这里</small></div><span class="file-status" id="qrbc-status">准备就绪</span></div><div class="qrbc-result-stage" id="qrbc-result-stage"><div class="file-empty"><span>QR</span><strong>输入内容开始生成</strong><small>结果仅在当前设备处理</small></div></div></section>
+    </div>
+  </div>`;
+}
+
+function qrBarcodeGenerateSettingsMarkup(mode) {
+  if (mode === 'qr-generate') return `<label class="file-field"><span>二维码内容</span><textarea id="qrbc-qr-text" rows="8" spellcheck="false" placeholder="输入网址、文本或联系方式">https://byetools.local</textarea></label><div class="file-field-grid"><label class="file-field"><span>纠错等级</span><select id="qrbc-qr-level"><option value="L">L · 约 7%</option><option value="M" selected>M · 约 15%</option><option value="Q">Q · 约 25%</option><option value="H">H · 约 30%</option></select></label><label class="file-field"><span>边距</span><input id="qrbc-qr-margin" type="number" min="0" max="20" value="4" /></label></div><div class="file-field-grid"><label class="file-field"><span>尺寸（像素）</span><input id="qrbc-qr-size" type="number" min="128" max="2048" value="360" /></label><label class="file-field"><span>前景色</span><input id="qrbc-qr-dark" type="color" value="#111827" /></label></div><label class="file-field"><span>背景色</span><input id="qrbc-qr-light" type="color" value="#ffffff" /></label><p class="file-form-hint">支持纯文本、URL、JSON 等内容，二维码生成完全离线。</p>`;
+  return `<label class="file-field"><span>条形码内容</span><input id="qrbc-barcode-text" type="text" value="BYETOOLS-2026" spellcheck="false" placeholder="输入要编码的数字或文本" /></label><div class="file-field-grid"><label class="file-field"><span>条码格式</span><select id="qrbc-barcode-format"><option value="code128" selected>Code 128 · 通用</option><option value="code39">Code 39 · 字母数字</option><option value="ean13">EAN-13 · 商品码</option><option value="ean8">EAN-8 · 商品码</option><option value="upca">UPC-A · 商品码</option><option value="itf14">ITF-14 · 物流码</option><option value="codabar">Codabar · 旧式码</option></select></label><label class="file-field"><span>缩放倍数</span><input id="qrbc-barcode-scale" type="number" min="1" max="8" value="3" /></label></div><div class="file-field-grid"><label class="file-field"><span>条码高度</span><input id="qrbc-barcode-height" type="number" min="5" max="200" value="15" /></label><label class="file-field"><span>条码颜色</span><input id="qrbc-barcode-foreground" type="color" value="#111827" /></label></div><div class="file-field-grid"><label class="file-field"><span>背景颜色</span><input id="qrbc-barcode-background" type="color" value="#ffffff" /></label><label class="file-check qrbc-check-field"><input id="qrbc-barcode-includetext" type="checkbox" checked /><span>显示文本</span></label></div><p class="file-form-hint">不同格式对内容有长度和字符限制，生成失败时会显示具体原因。</p>`;
+}
+
+function qrBarcodeRecognizeSettingsMarkup(mode) {
+  const title = mode === 'qr-recognize' ? '二维码图片' : '条形码图片';
+  return `<div class="qrbc-recognize-copy"><strong>${title}</strong><small>支持 PNG、JPEG、WebP、GIF 等常见图片格式</small></div>${fileDropzoneMarkup('qrbc-file-input', 'qrbc-dropzone', 'image/*')}<div class="file-source-meta" id="qrbc-file-meta">尚未选择图片</div><div class="qrbc-recognize-preview" id="qrbc-recognize-preview"><div class="file-empty"><span>${mode === 'qr-recognize' ? 'QR' : 'BAR'}</span><strong>选择图片开始识别</strong><small>识别在本地完成，不会上传文件</small></div></div><div class="qrbc-recognize-note"><span>i</span><p>建议使用清晰、完整且对比度较高的码图，倾斜或模糊图片可能无法识别。</p></div>`;
+}
+
+function qrBarcodeActionsMarkup(mode) {
+  if (mode === 'qr-generate' || mode === 'barcode-generate') return `<button class="primary-button" type="button" data-qrbc-action="generate">生成${mode === 'qr-generate' ? '二维码' : '条形码'}</button><button class="secondary-button" type="button" data-qrbc-action="download" disabled>下载 PNG</button><button class="secondary-button" type="button" data-qrbc-action="copy" disabled>复制内容</button><button class="secondary-button" type="button" data-qrbc-action="clear">清空</button>`;
+  return `<button class="primary-button" type="button" data-qrbc-action="recognize">识别图片</button><button class="secondary-button" type="button" data-qrbc-action="copy-result" disabled>复制结果</button><button class="secondary-button" type="button" data-qrbc-action="clear">清空</button>`;
+}
+
+function renderQrBarcodeMode(content, mode) {
+  const isGenerate = mode.endsWith('generate');
+  const isQr = mode.startsWith('qr-');
+  const title = mode === 'qr-generate' ? '二维码内容' : mode === 'barcode-generate' ? '条形码内容' : isQr ? '二维码识别' : '条形码识别';
+  const caption = mode === 'qr-generate' ? '输入文本后生成二维码图片' : mode === 'barcode-generate' ? '选择格式并生成条形码图片' : '上传图片后在本地解析编码内容';
+  const resultTitle = isGenerate ? `${isQr ? '二维码' : '条形码'}预览` : '识别结果';
+  const resultCaption = isGenerate ? '生成结果会显示在这里' : '识别出的文本会显示在这里';
+  content.querySelector('#qrbc-config-title').textContent = title;
+  content.querySelector('#qrbc-config-caption').textContent = caption;
+  content.querySelector('#qrbc-config-badge').textContent = isGenerate ? (isQr ? 'QR CODE' : 'BARCODE') : (isQr ? 'QR IMAGE' : 'BARCODE IMAGE');
+  content.querySelector('#qrbc-result-title').textContent = resultTitle;
+  content.querySelector('#qrbc-result-caption').textContent = resultCaption;
+  content.querySelector('#qrbc-settings').innerHTML = isGenerate ? qrBarcodeGenerateSettingsMarkup(mode) : qrBarcodeRecognizeSettingsMarkup(mode);
+  content.querySelector('#qrbc-actions').innerHTML = qrBarcodeActionsMarkup(mode);
+  content.querySelector('#qrbc-result-stage').innerHTML = isGenerate ? '<div class="file-empty"><span>QR</span><strong>输入内容开始生成</strong><small>结果仅在当前设备处理</small></div>' : '<div class="qrbc-recognize-result is-empty"><span>RESULT</span><strong>等待识别结果</strong><small>上传图片后点击识别</small></div>';
+}
+
+function bindQrBarcodeWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const tabs = [...content.querySelectorAll('[data-file-mode]')];
+  const settings = content.querySelector('#qrbc-settings');
+  const actions = content.querySelector('#qrbc-actions');
+  const resultStage = content.querySelector('#qrbc-result-stage');
+  const status = content.querySelector('#qrbc-status');
+  let mode = 'qr-generate';
+  let generatedBlob = null;
+  let generatedName = '';
+  let currentFile = null;
+  let currentDataUrl = '';
+  let recognitionText = '';
+  let operationToken = 0;
+
+  const setStatus = (value, stateClass = '') => {
+    status.textContent = value;
+    status.className = `file-status ${stateClass}`.trim();
+  };
+  const setGeneratedButtons = (enabled) => {
+    actions.querySelector('[data-qrbc-action="download"]')?.toggleAttribute('disabled', !enabled);
+    actions.querySelector('[data-qrbc-action="copy"]')?.toggleAttribute('disabled', !enabled);
+  };
+  const setRecognitionButtons = (enabled) => actions.querySelector('[data-qrbc-action="copy-result"]')?.toggleAttribute('disabled', !enabled);
+  const resetOutput = () => {
+    generatedBlob = null;
+    generatedName = '';
+    recognitionText = '';
+    setGeneratedButtons(false);
+    setRecognitionButtons(false);
+    resultStage.innerHTML = mode.endsWith('generate') ? '<div class="file-empty"><span>QR</span><strong>输入内容开始生成</strong><small>结果仅在当前设备处理</small></div>' : '<div class="qrbc-recognize-result is-empty"><span>RESULT</span><strong>等待识别结果</strong><small>上传图片后点击识别</small></div>';
+    setStatus('准备就绪');
+  };
+  const renderPreview = (imageUrl, file) => {
+    const preview = content.querySelector('#qrbc-recognize-preview');
+    const meta = content.querySelector('#qrbc-file-meta');
+    if (!preview || !meta) return;
+    if (!imageUrl || !file) {
+      preview.innerHTML = `<div class="file-empty"><span>${mode === 'qr-recognize' ? 'QR' : 'BAR'}</span><strong>选择图片开始识别</strong><small>识别在本地完成，不会上传文件</small></div>`;
+      meta.textContent = '尚未选择图片';
+      return;
+    }
+    preview.innerHTML = `<img class="file-preview-image" src="${imageUrl}" alt="待识别的${mode === 'qr-recognize' ? '二维码' : '条形码'}图片" />`;
+    meta.textContent = `${file.name} · ${formatFileSize(file.size)}`;
+  };
+  const setFile = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setStatus('请选择图片文件', 'is-error'); return; }
+    const token = ++operationToken;
+    try {
+      currentFile = file;
+      currentDataUrl = await readFileDataUrl(file);
+      if (token !== operationToken) return;
+      await loadImageElement(currentDataUrl);
+      renderPreview(currentDataUrl, file);
+      resetOutput();
+      setStatus('图片已就绪', 'is-success');
+    } catch (error) {
+      currentFile = null;
+      currentDataUrl = '';
+      renderPreview('', null);
+      setStatus(error.message, 'is-error');
+    }
+  };
+  const bindFileInput = () => {
+    const fileInput = content.querySelector('#qrbc-file-input');
+    const dropzone = content.querySelector('#qrbc-dropzone');
+    fileInput?.addEventListener('change', () => setFile(fileInput.files?.[0]));
+    if (!dropzone) return;
+    ['dragenter', 'dragover'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add('is-dragging'); }));
+    ['dragleave', 'drop'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove('is-dragging'); if (eventName === 'drop') setFile(event.dataTransfer.files?.[0]); }));
+  };
+  const generateQr = async () => {
+    const text = settings.querySelector('#qrbc-qr-text')?.value || '';
+    if (!text.trim()) throw new Error('请输入二维码内容');
+    const size = Math.min(2048, Math.max(128, Number(settings.querySelector('#qrbc-qr-size').value) || 360));
+    const dataUrl = await QRCode.toDataURL(text, { width: size, margin: Math.max(0, Number(settings.querySelector('#qrbc-qr-margin').value) || 0), errorCorrectionLevel: settings.querySelector('#qrbc-qr-level').value, color: { dark: settings.querySelector('#qrbc-qr-dark').value, light: settings.querySelector('#qrbc-qr-light').value } });
+    generatedBlob = dataUrlToBlob(dataUrl);
+    generatedName = 'byetools-qrcode.png';
+    resultStage.innerHTML = `<div class="qrbc-generated-output"><img class="qrbc-generated-image" src="${dataUrl}" alt="生成的二维码" /><div class="qrbc-output-meta"><strong>${size} × ${size}</strong><span>PNG · ${formatFileSize(generatedBlob.size)}</span></div></div>`;
+    setGeneratedButtons(true);
+    setStatus('生成完成', 'is-success');
+  };
+  const generateBarcode = async () => {
+    const text = settings.querySelector('#qrbc-barcode-text')?.value || '';
+    if (!text.trim()) throw new Error('请输入条形码内容');
+    const canvas = document.createElement('canvas');
+    const bcid = settings.querySelector('#qrbc-barcode-format').value;
+    bwipjs.toCanvas(canvas, { bcid, text, scale: Math.min(8, Math.max(1, Number(settings.querySelector('#qrbc-barcode-scale').value) || 3)), height: Math.min(200, Math.max(5, Number(settings.querySelector('#qrbc-barcode-height').value) || 15)), includetext: settings.querySelector('#qrbc-barcode-includetext').checked, textxalign: 'center', backgroundcolor: settings.querySelector('#qrbc-barcode-background').value.replace('#', ''), barcolor: settings.querySelector('#qrbc-barcode-foreground').value.replace('#', '') });
+    generatedBlob = await canvasToBlob(canvas, 'image/png');
+    generatedName = `byetools-${bcid}.png`;
+    resultStage.innerHTML = '<div class="qrbc-generated-output"><div class="qrbc-barcode-canvas" id="qrbc-barcode-canvas"></div><div class="qrbc-output-meta"><strong></strong><span></span></div></div>';
+    resultStage.querySelector('#qrbc-barcode-canvas').append(canvas);
+    resultStage.querySelector('.qrbc-output-meta strong').textContent = `${canvas.width} × ${canvas.height}`;
+    resultStage.querySelector('.qrbc-output-meta span').textContent = `PNG · ${formatFileSize(generatedBlob.size)}`;
+    setGeneratedButtons(true);
+    setStatus('生成完成', 'is-success');
+  };
+  const generate = async () => {
+    try {
+      setStatus('正在生成');
+      if (mode === 'qr-generate') await generateQr(); else await generateBarcode();
+    } catch (error) {
+      generatedBlob = null;
+      setGeneratedButtons(false);
+      setStatus(`生成失败：${error.message}`, 'is-error');
+      showToast(`生成失败：${error.message}`);
+    }
+  };
+  const recognize = async () => {
+    if (!currentDataUrl || !currentFile) throw new Error('请先选择一张图片');
+    const token = ++operationToken;
+    setStatus('正在识别');
+    try {
+      const image = await loadImageElement(currentDataUrl);
+      const reader = new BrowserMultiFormatReader();
+      const result = await reader.decodeFromImageElement(image);
+      if (token !== operationToken) return;
+      recognitionText = result.getText() || '';
+      const format = String(result.getBarcodeFormat?.() || '').replace(/^.*\./, '') || '未知格式';
+      resultStage.innerHTML = `<div class="qrbc-recognize-result"><div class="qrbc-recognize-result-head"><span>识别成功</span><b>${escapeHtml(format)}</b></div><textarea id="qrbc-recognized-text" readonly>${escapeHtml(recognitionText)}</textarea><small>内容长度 ${recognitionText.length} 个字符</small></div>`;
+      setRecognitionButtons(true);
+      setStatus('识别完成', 'is-success');
+    } catch (error) {
+      if (token !== operationToken) return;
+      recognitionText = '';
+      resultStage.innerHTML = '<div class="qrbc-recognize-result is-error"><span>未识别</span><strong>没有找到可读取的编码</strong><small>请更换清晰、完整且对比度较高的图片</small></div>';
+      setRecognitionButtons(false);
+      setStatus('识别失败', 'is-error');
+    }
+  };
+  const renderMode = (nextMode) => {
+    mode = nextMode;
+    operationToken += 1;
+    tabs.forEach((tab) => { const active = tab.dataset.fileMode === mode; tab.classList.toggle('is-active', active); tab.setAttribute('aria-selected', String(active)); });
+    currentFile = null;
+    currentDataUrl = '';
+    renderQrBarcodeMode(content, mode);
+    resetOutput();
+    bindFileInput();
+  };
+  content.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-file-mode]');
+    if (tab && content.contains(tab)) { renderMode(tab.dataset.fileMode); return; }
+    const action = event.target.closest('[data-qrbc-action]')?.dataset.qrbcAction;
+    if (!action) return;
+    if (action === 'generate') { generate(); return; }
+    if (action === 'recognize') { recognize().catch((error) => setStatus(error.message, 'is-error')); return; }
+    if (action === 'download' && generatedBlob) { downloadBlob(generatedBlob, generatedName); return; }
+    if (action === 'copy') { copyText(mode === 'qr-generate' ? settings.querySelector('#qrbc-qr-text').value : settings.querySelector('#qrbc-barcode-text').value).then(() => showToast('内容已复制')); return; }
+    if (action === 'copy-result' && recognitionText) { copyText(recognitionText).then(() => showToast('识别结果已复制')); return; }
+    if (action === 'clear') {
+      currentFile = null;
+      currentDataUrl = '';
+      operationToken += 1;
+      const fileInput = content.querySelector('#qrbc-file-input');
+      if (fileInput) fileInput.value = '';
+      renderPreview('', null);
+      resetOutput();
+    }
+  });
+  renderMode(mode);
+  activeWorkspaceCleanup = () => { operationToken += 1; generatedBlob = null; currentFile = null; currentDataUrl = ''; };
+}
+
+function imageToolsWorkbenchMarkup() {
+  return `<div class="file-workbench image-workbench">
+    ${fileModeTabsMarkup('image-mode-tabs', imageToolModes, 'compress')}
+    <div class="file-tool-layout">
+      <section class="workspace-card file-source-card"><div class="workspace-card-head"><div><strong>源图片</strong><small id="image-source-caption">支持 PNG、JPEG、WebP、GIF、AVIF</small></div><span class="code-badge">IMAGE</span></div>${fileDropzoneMarkup('image-file-input', 'image-dropzone', 'image/*')}<div class="file-source-meta" id="image-file-meta">尚未选择图片</div><div class="file-preview-frame" id="image-source-preview"><div class="file-empty"><span>IMG</span><strong>选择图片开始处理</strong><small>支持点击选择或直接拖放</small></div></div></section>
+      <section class="workspace-card file-settings-card"><div class="workspace-card-head"><div><strong>处理设置</strong><small id="image-settings-caption">调整参数后生成本地结果</small></div><span class="file-status" id="image-status">等待输入</span></div><div class="file-settings" id="image-settings"></div><div class="file-action-row"><button class="primary-button" type="button" data-file-action="image-process">处理图片</button><button class="secondary-button" type="button" data-file-action="image-download" disabled>下载结果</button><button class="secondary-button" type="button" data-file-action="image-clear">清空</button></div></section>
+    </div>
+    <section class="workspace-card file-result-card"><div class="workspace-card-head"><div><strong>处理结果</strong><small id="image-result-caption">生成结果会显示在这里</small></div><span class="code-badge" id="image-result-badge">OUTPUT</span></div><div class="file-result-stage" id="image-result-stage"><div class="file-empty"><span>↗</span><strong>等待处理结果</strong><small>完成处理后可预览和下载</small></div></div></section>
+  </div>`;
+}
+
+function imageSettingsMarkup(mode) {
+  if (mode === 'compress') return `<div class="file-field-grid"><label class="file-field"><span>输出格式</span><select id="image-output-format"><option value="source">保持原格式</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option></select></label><label class="file-field"><span>压缩质量 <b id="image-quality-value">82</b></span><input id="image-quality" type="range" min="10" max="100" value="82" /></label></div><p class="file-form-hint">质量越低，文件越小；PNG 输出使用无损格式。</p>`;
+  if (mode === 'resize') return `<div class="file-field-grid"><label class="file-field"><span>宽度（像素）</span><input id="image-width" type="number" min="1" max="12000" value="1200" /></label><label class="file-field"><span>高度（像素）</span><input id="image-height" type="number" min="1" max="12000" value="800" /></label></div><div class="file-inline-options"><label class="file-check"><input id="image-lock-ratio" type="checkbox" checked /><span>锁定宽高比</span></label><label class="file-field file-field-inline"><span>缩放方式</span><select id="image-fit"><option value="contain">完整保留</option><option value="cover">覆盖裁切</option><option value="fill">拉伸填充</option></select></label></div><p class="file-form-hint">输入任一边尺寸后，锁定比例会自动同步另一边。</p>`;
+  if (mode === 'crop') return `<div class="image-crop-settings">
+    <section class="image-crop-section"><div class="image-crop-section-head"><strong>裁剪比例</strong><small id="image-crop-ratio-label">自由选择</small></div><div class="image-crop-preset-grid">${imageCropAspectPresets.map(([value, label]) => `<button class="image-crop-preset ${value === 'free' ? 'is-active' : ''}" type="button" data-crop-aspect="${value}">${label}</button>`).join('')}</div><div class="image-crop-custom" id="image-crop-custom" hidden><label class="file-field"><span>宽</span><input id="image-crop-custom-width" type="number" min="1" value="4" /></label><b>:</b><label class="file-field"><span>高</span><input id="image-crop-custom-height" type="number" min="1" value="3" /></label></div></section>
+    <section class="image-crop-section"><div class="image-crop-section-head"><strong>旋转与翻转</strong><small id="image-crop-angle-value">0°</small></div><div class="image-crop-action-grid"><button class="secondary-button" type="button" data-crop-action="rotate-left">↶ 向左旋转</button><button class="secondary-button" type="button" data-crop-action="rotate-right">↷ 向右旋转</button><button class="secondary-button" type="button" data-crop-action="flip-x">↔ 水平翻转</button><button class="secondary-button" type="button" data-crop-action="flip-y">↕ 垂直翻转</button></div><div class="image-crop-range"><input id="image-crop-angle" type="range" min="-180" max="180" value="0" step="1" /><button class="text-button" type="button" data-crop-action="reset-angle">归零</button></div></section>
+    <section class="image-crop-section"><div class="image-crop-section-head"><strong>裁剪形状</strong><small>结果会保留透明区域</small></div><div class="image-crop-shape-grid">${imageCropShapes.map(([value, label, icon]) => `<button class="image-crop-shape is-${value === 'rectangle' ? 'active' : ''}" type="button" data-crop-shape="${value}"><b>${icon}</b><span>${label}</span></button>`).join('')}</div></section>
+    <section class="image-crop-section"><div class="image-crop-section-head"><strong>裁剪框（像素）</strong><small>可用方向键移动</small></div><div class="file-field-grid image-crop-frame-fields"><label class="file-field"><span>X</span><input id="image-crop-x" type="number" min="0" value="0" /></label><label class="file-field"><span>Y</span><input id="image-crop-y" type="number" min="0" value="0" /></label><label class="file-field"><span>宽</span><input id="image-crop-width" type="number" min="1" value="800" /></label><label class="file-field"><span>高</span><input id="image-crop-height" type="number" min="1" value="600" /></label></div></section>
+    <section class="image-crop-section"><div class="image-crop-section-head"><strong>导出尺寸</strong><small id="image-crop-output-caption">保持裁剪尺寸</small></div><div class="image-crop-output-grid">${[['source', '原尺寸'], ['128', '128'], ['256', '256'], ['512', '512'], ['1024', '1024']].map(([value, label]) => `<button class="image-crop-output-size ${value === 'source' ? 'is-active' : ''}" type="button" data-crop-output="${value}">${label}</button>`).join('')}</div><label class="file-field"><span>导出宽度（像素）</span><input id="image-crop-output-width" type="number" min="1" max="12000" placeholder="保持裁剪宽度" /></label><label class="file-field"><span>输出格式</span><select id="image-output-format"><option value="source">保持原格式</option><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label></section>
+  </div>`;
+  if (mode === 'format') return `<div class="file-field-grid"><label class="file-field"><span>目标格式</span><select id="image-output-format"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp" selected>WebP</option><option value="image/avif">AVIF</option></select></label><label class="file-field"><span>输出质量 <b id="image-quality-value">90</b></span><input id="image-quality" type="range" min="10" max="100" value="90" /></label></div><p class="file-form-hint">AVIF 是否可用取决于当前浏览器；不支持时会自动回退为 PNG。</p>`;
+  return `<label class="file-field"><span>转换方向</span><select id="image-base64-direction"><option value="image-to-base64">图片转 Base64</option><option value="base64-to-image">Base64 转图片</option></select></label><label class="file-field image-base64-input-field" id="image-base64-input-field" hidden><span>Base64 内容</span><textarea id="image-base64-input" rows="9" spellcheck="false" placeholder="粘贴 data:image/...;base64,... 或纯 Base64 文本"></textarea></label><p class="file-form-hint">图片转 Base64 会输出可直接用于 HTML、CSS 的 data URL。</p>`;
+}
+
+function imageMimeExtension(type, fallback = 'png') {
+  return ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' }[type] || fallback);
+}
+
+function readFileDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error('文件读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageElement(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('图片无法解析，请确认文件格式有效'));
+    image.src = source;
+  });
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('当前浏览器不支持该输出格式')), type, quality);
+  });
+}
+
+function cropShapePath(context, shape, width, height) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(width, height) / 2;
+  const polygon = (sides, rotation = -Math.PI / 2) => {
+    context.beginPath();
+    for (let index = 0; index < sides; index += 1) {
+      const angle = rotation + (Math.PI * 2 * index) / sides;
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
+  };
+  if (shape === 'rounded') {
+    context.beginPath();
+    context.roundRect(0, 0, width, height, Math.min(width, height) * .16);
+  } else if (shape === 'circle') {
+    context.beginPath();
+    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  } else if (shape === 'oval') {
+    context.beginPath();
+    context.ellipse(centerX, centerY, width / 2, height / 2, 0, 0, Math.PI * 2);
+  } else if (shape === 'triangle') polygon(3);
+  else if (shape === 'diamond') polygon(4, 0);
+  else if (shape === 'pentagon') polygon(5);
+  else if (shape === 'hexagon') polygon(6);
+  else if (shape === 'star') {
+    context.beginPath();
+    const innerRadius = radius * .42;
+    for (let index = 0; index < 10; index += 1) {
+      const angle = -Math.PI / 2 + (Math.PI * index) / 5;
+      const currentRadius = index % 2 === 0 ? radius : innerRadius;
+      const x = centerX + currentRadius * Math.cos(angle);
+      const y = centerY + currentRadius * Math.sin(angle);
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
+  } else if (shape === 'heart') {
+    context.beginPath();
+    context.moveTo(centerX, height * .9);
+    context.bezierCurveTo(width * .07, height * .55, width * .02, height * .2, width * .25, height * .12);
+    context.bezierCurveTo(width * .39, height * .07, centerX, height * .2, centerX, height * .32);
+    context.bezierCurveTo(centerX, height * .2, width * .61, height * .07, width * .75, height * .12);
+    context.bezierCurveTo(width * .98, height * .2, width * .93, height * .55, centerX, height * .9);
+    context.closePath();
+  } else {
+    context.beginPath();
+    context.rect(0, 0, width, height);
+  }
+}
+
+function createCropCanvas(image, settings) {
+  const sourceWidth = image.naturalWidth;
+  const sourceHeight = image.naturalHeight;
+  const cropWidth = Math.max(1, Math.min(Math.round(Number(settings.width) || sourceWidth), sourceWidth));
+  const cropHeight = Math.max(1, Math.min(Math.round(Number(settings.height) || sourceHeight), sourceHeight));
+  const x = Math.max(0, Math.min(Math.round(Number(settings.x) || 0), sourceWidth - cropWidth));
+  const y = Math.max(0, Math.min(Math.round(Number(settings.y) || 0), sourceHeight - cropHeight));
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = cropWidth;
+  cropCanvas.height = cropHeight;
+  const cropContext = cropCanvas.getContext('2d');
+  cropContext.save();
+  cropContext.translate(cropWidth / 2, cropHeight / 2);
+  cropContext.scale(settings.flipX ? -1 : 1, settings.flipY ? -1 : 1);
+  cropContext.drawImage(image, x, y, cropWidth, cropHeight, -cropWidth / 2, -cropHeight / 2, cropWidth, cropHeight);
+  cropContext.restore();
+
+  const radians = (Number(settings.angle) || 0) * Math.PI / 180;
+  const sine = Math.abs(Math.sin(radians));
+  const cosine = Math.abs(Math.cos(radians));
+  const rotatedWidth = Math.max(1, Math.ceil(cropWidth * cosine + cropHeight * sine));
+  const rotatedHeight = Math.max(1, Math.ceil(cropWidth * sine + cropHeight * cosine));
+  const rotatedCanvas = document.createElement('canvas');
+  rotatedCanvas.width = rotatedWidth;
+  rotatedCanvas.height = rotatedHeight;
+  const rotatedContext = rotatedCanvas.getContext('2d');
+  rotatedContext.save();
+  cropShapePath(rotatedContext, settings.shape || 'rectangle', rotatedWidth, rotatedHeight);
+  rotatedContext.clip();
+  rotatedContext.translate(rotatedWidth / 2, rotatedHeight / 2);
+  rotatedContext.rotate(radians);
+  rotatedContext.drawImage(cropCanvas, -cropWidth / 2, -cropHeight / 2);
+  rotatedContext.restore();
+
+  const outputWidth = Number(settings.outputWidth);
+  if (!outputWidth || outputWidth === rotatedWidth) return rotatedCanvas;
+  const outputHeight = Math.max(1, Math.round(rotatedHeight * outputWidth / rotatedWidth));
+  const outputCanvas = document.createElement('canvas');
+  outputCanvas.width = Math.max(1, Math.round(outputWidth));
+  outputCanvas.height = outputHeight;
+  outputCanvas.getContext('2d').drawImage(rotatedCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+  return outputCanvas;
+}
+
+function createImageCanvas(image, mode, settings) {
+  const sourceWidth = image.naturalWidth;
+  const sourceHeight = image.naturalHeight;
+  if (mode === 'crop') {
+    const width = Math.max(1, Math.min(Number(settings.width) || sourceWidth, sourceWidth));
+    const height = Math.max(1, Math.min(Number(settings.height) || sourceHeight, sourceHeight));
+    const x = Math.max(0, Math.min(Number(settings.x) || 0, sourceWidth - width));
+    const y = Math.max(0, Math.min(Number(settings.y) || 0, sourceHeight - height));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(image, x, y, width, height, 0, 0, width, height);
+    return canvas;
+  }
+  if (mode === 'resize') {
+    const requestedWidth = Math.max(1, Number(settings.width) || sourceWidth);
+    const requestedHeight = Math.max(1, Number(settings.height) || sourceHeight);
+    let width = requestedWidth;
+    let height = requestedHeight;
+    if (settings.fit === 'contain') {
+      const scale = Math.min(requestedWidth / sourceWidth, requestedHeight / sourceHeight);
+      width = Math.max(1, Math.round(sourceWidth * scale));
+      height = Math.max(1, Math.round(sourceHeight * scale));
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (settings.fit === 'cover') {
+      const scale = Math.max(width / sourceWidth, height / sourceHeight);
+      const drawWidth = sourceWidth * scale;
+      const drawHeight = sourceHeight * scale;
+      context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+    } else context.drawImage(image, 0, 0, width, height);
+    return canvas;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = sourceWidth;
+  canvas.height = sourceHeight;
+  canvas.getContext('2d').drawImage(image, 0, 0);
+  return canvas;
+}
+
+function parseImageBase64(value) {
+  const normalized = value.trim().replace(/\s+/g, '');
+  if (!normalized) throw new Error('请输入 Base64 内容');
+  if (normalized.startsWith('data:image/')) return normalized;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) throw new Error('Base64 内容格式不正确');
+  return `data:image/png;base64,${normalized}`;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const match = String(dataUrl).match(/^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/);
+  if (!match) throw new Error('图片 Data URL 格式不正确');
+  const binary = atob(match[2]);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new Blob([bytes], { type: match[1] || 'image/png' });
+}
+
+function imageCropEditorMarkup() {
+  return `<div class="image-crop-editor" id="image-crop-editor"><div class="image-crop-stage" id="image-crop-stage"><canvas id="image-crop-canvas"></canvas><div class="image-crop-frame is-rectangle" id="image-crop-frame" tabindex="0" role="slider" aria-label="裁剪框"><span class="image-crop-dimension" id="image-crop-dimension"></span><i class="image-crop-handle is-nw" data-crop-handle="nw"></i><i class="image-crop-handle is-n" data-crop-handle="n"></i><i class="image-crop-handle is-ne" data-crop-handle="ne"></i><i class="image-crop-handle is-e" data-crop-handle="e"></i><i class="image-crop-handle is-se" data-crop-handle="se"></i><i class="image-crop-handle is-s" data-crop-handle="s"></i><i class="image-crop-handle is-sw" data-crop-handle="sw"></i><i class="image-crop-handle is-w" data-crop-handle="w"></i></div></div><div class="image-crop-editor-foot"><span>拖动裁剪框选择区域</span><span>方向键微调 · Shift 加速</span></div></div>`;
+}
+
+function bindImageToolsWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const tabs = content.querySelector('#image-mode-tabs');
+  const settingsPanel = content.querySelector('#image-settings');
+  const sourcePreview = content.querySelector('#image-source-preview');
+  const resultStage = content.querySelector('#image-result-stage');
+  const fileInput = content.querySelector('#image-file-input');
+  const dropzone = content.querySelector('#image-dropzone');
+  const fileMeta = content.querySelector('#image-file-meta');
+  const status = content.querySelector('#image-status');
+  const resultCaption = content.querySelector('#image-result-caption');
+  const resultBadge = content.querySelector('#image-result-badge');
+  const processButton = content.querySelector('[data-file-action="image-process"]');
+  const downloadButton = content.querySelector('[data-file-action="image-download"]');
+  let mode = 'compress';
+  let currentFile = null;
+  let currentDataUrl = '';
+  let currentImage = null;
+  let resultBlob = null;
+  let resultUrl = '';
+  let resultName = '';
+  let fileLoadPromise = null;
+  const workbench = content.querySelector('.image-workbench');
+  const cropState = { x: 0, y: 0, width: 0, height: 0, aspect: 'free', customWidth: 4, customHeight: 3, shape: 'rectangle', angle: 0, flipX: false, flipY: false, outputWidth: 0, sourceFile: null };
+  let cropDisplay = null;
+  let cropDrag = null;
+  let cropResizeFrame = 0;
+
+  const cropAspectRatio = () => {
+    if (!currentImage) return null;
+    if (cropState.aspect === 'original') return currentImage.naturalWidth / currentImage.naturalHeight;
+    if (cropState.aspect === 'custom') return Math.max(1, Number(cropState.customWidth) || 4) / Math.max(1, Number(cropState.customHeight) || 3);
+    const preset = imageCropAspectPresets.find((item) => item[0] === cropState.aspect);
+    return typeof preset?.[2] === 'number' ? preset[2] : null;
+  };
+  const clampCropRect = (x, y, width, height, keepRatio = true) => {
+    if (!currentImage) return;
+    const maxWidth = currentImage.naturalWidth;
+    const maxHeight = currentImage.naturalHeight;
+    let nextWidth = Math.max(20, Math.min(Math.round(Number(width) || 20), maxWidth));
+    let nextHeight = Math.max(20, Math.min(Math.round(Number(height) || 20), maxHeight));
+    const ratio = keepRatio ? cropAspectRatio() : null;
+    if (ratio) {
+      if (nextWidth / nextHeight > ratio) nextHeight = Math.max(20, Math.round(nextWidth / ratio));
+      else nextWidth = Math.max(20, Math.round(nextHeight * ratio));
+      if (nextWidth > maxWidth) { nextWidth = maxWidth; nextHeight = Math.max(20, Math.round(nextWidth / ratio)); }
+      if (nextHeight > maxHeight) { nextHeight = maxHeight; nextWidth = Math.max(20, Math.round(nextHeight * ratio)); }
+    }
+    cropState.width = Math.min(maxWidth, nextWidth);
+    cropState.height = Math.min(maxHeight, nextHeight);
+    cropState.x = Math.max(0, Math.min(Math.round(Number(x) || 0), maxWidth - cropState.width));
+    cropState.y = Math.max(0, Math.min(Math.round(Number(y) || 0), maxHeight - cropState.height));
+  };
+  const initializeCropState = () => {
+    if (!currentImage || cropState.sourceFile === currentFile) return;
+    cropState.sourceFile = currentFile;
+    cropState.aspect = 'free';
+    cropState.customWidth = 4;
+    cropState.customHeight = 3;
+    cropState.shape = 'rectangle';
+    cropState.angle = 0;
+    cropState.flipX = false;
+    cropState.flipY = false;
+    cropState.outputWidth = 0;
+    clampCropRect(currentImage.naturalWidth * .1, currentImage.naturalHeight * .1, currentImage.naturalWidth * .8, currentImage.naturalHeight * .8, false);
+  };
+  const syncCropFields = () => {
+    if (mode !== 'crop') return;
+    const setValue = (selector, value) => { const field = settingsPanel.querySelector(selector); if (field && document.activeElement !== field) field.value = value; };
+    setValue('#image-crop-x', cropState.x);
+    setValue('#image-crop-y', cropState.y);
+    setValue('#image-crop-width', cropState.width || '');
+    setValue('#image-crop-height', cropState.height || '');
+    setValue('#image-crop-output-width', cropState.outputWidth || '');
+    const angle = settingsPanel.querySelector('#image-crop-angle');
+    const angleValue = settingsPanel.querySelector('#image-crop-angle-value');
+    if (angle && document.activeElement !== angle) angle.value = cropState.angle;
+    if (angleValue) angleValue.textContent = `${cropState.angle}°`;
+    const ratioLabel = settingsPanel.querySelector('#image-crop-ratio-label');
+    if (ratioLabel) ratioLabel.textContent = cropState.aspect === 'free' ? '自由选择' : cropState.aspect === 'original' ? '原始比例' : cropState.aspect === 'custom' ? `${cropState.customWidth}:${cropState.customHeight}` : cropState.aspect;
+    settingsPanel.querySelectorAll('[data-crop-aspect]').forEach((button) => button.classList.toggle('is-active', button.dataset.cropAspect === cropState.aspect));
+    settingsPanel.querySelectorAll('[data-crop-shape]').forEach((button) => button.classList.toggle('is-active', button.dataset.cropShape === cropState.shape));
+    settingsPanel.querySelectorAll('[data-crop-output]').forEach((button) => button.classList.toggle('is-active', (button.dataset.cropOutput === 'source' && !cropState.outputWidth) || Number(button.dataset.cropOutput) === cropState.outputWidth));
+    const custom = settingsPanel.querySelector('#image-crop-custom');
+    if (custom) custom.hidden = cropState.aspect !== 'custom';
+    const caption = settingsPanel.querySelector('#image-crop-output-caption');
+    if (caption) caption.textContent = cropState.outputWidth ? `输出宽度 ${cropState.outputWidth}px` : '保持裁剪尺寸';
+  };
+  const renderCropEditor = () => {
+    if (mode !== 'crop' || !currentImage) return;
+    const editor = sourcePreview.querySelector('#image-crop-editor');
+    const stage = sourcePreview.querySelector('#image-crop-stage');
+    const canvas = sourcePreview.querySelector('#image-crop-canvas');
+    const frame = sourcePreview.querySelector('#image-crop-frame');
+    if (!editor || !stage || !canvas || !frame) return;
+    const maxWidth = Math.max(220, editor.clientWidth - 28);
+    const maxHeight = Math.max(260, editor.clientHeight - 46);
+    const scale = Math.min(maxWidth / currentImage.naturalWidth, maxHeight / currentImage.naturalHeight);
+    const displayWidth = currentImage.naturalWidth * scale;
+    const displayHeight = currentImage.naturalHeight * scale;
+    cropDisplay = { scale, width: displayWidth, height: displayHeight };
+    stage.style.width = `${displayWidth}px`;
+    stage.style.height = `${displayHeight}px`;
+    canvas.width = currentImage.naturalWidth;
+    canvas.height = currentImage.naturalHeight;
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.save();
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate((cropState.angle * Math.PI) / 180);
+    context.scale(cropState.flipX ? -1 : 1, cropState.flipY ? -1 : 1);
+    context.drawImage(currentImage, -canvas.width / 2, -canvas.height / 2);
+    context.restore();
+    frame.style.left = `${cropState.x * scale}px`;
+    frame.style.top = `${cropState.y * scale}px`;
+    frame.style.width = `${cropState.width * scale}px`;
+    frame.style.height = `${cropState.height * scale}px`;
+    frame.className = `image-crop-frame is-${cropState.shape}`;
+    frame.tabIndex = 0;
+    frame.setAttribute('aria-valuetext', `${cropState.width} × ${cropState.height}`);
+    const dimension = frame.querySelector('#image-crop-dimension');
+    if (dimension) dimension.textContent = `${cropState.width} × ${cropState.height}`;
+  };
+  const queueCropRender = () => {
+    if (cropResizeFrame) cancelAnimationFrame(cropResizeFrame);
+    cropResizeFrame = requestAnimationFrame(() => { cropResizeFrame = 0; renderCropEditor(); });
+  };
+  const pointerToImage = (event) => {
+    const stage = sourcePreview.querySelector('#image-crop-stage');
+    if (!stage || !cropDisplay) return { x: cropState.x, y: cropState.y };
+    const rect = stage.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(currentImage.naturalWidth, (event.clientX - rect.left) / cropDisplay.scale)), y: Math.max(0, Math.min(currentImage.naturalHeight, (event.clientY - rect.top) / cropDisplay.scale)) };
+  };
+  const resizeCropFromPointer = (handle, dx, dy) => {
+    const initial = cropDrag.initial;
+    let left = initial.x;
+    let top = initial.y;
+    let right = initial.x + initial.width;
+    let bottom = initial.y + initial.height;
+    if (handle.includes('w')) left += dx;
+    if (handle.includes('e')) right += dx;
+    if (handle.includes('n')) top += dy;
+    if (handle.includes('s')) bottom += dy;
+    const ratio = cropAspectRatio();
+    if (ratio) {
+      let width = Math.abs(right - left);
+      let height = Math.abs(bottom - top);
+      if (handle === 'e' || handle === 'w') height = width / ratio;
+      else if (handle === 'n' || handle === 's') width = height * ratio;
+      else { width = Math.max(width, height * ratio); height = width / ratio; }
+      if (handle.includes('w')) left = initial.x + initial.width - width;
+      else right = initial.x + width;
+      if (handle.includes('n')) top = initial.y + initial.height - height;
+      else bottom = initial.y + height;
+    }
+    clampCropRect(left, top, right - left, bottom - top, Boolean(ratio));
+  };
+  const bindCropEditor = () => {
+    const frame = sourcePreview.querySelector('#image-crop-frame');
+    if (!frame || frame.dataset.bound === 'true') return;
+    frame.dataset.bound = 'true';
+    frame.addEventListener('pointerdown', (event) => {
+      if (!currentImage || !cropDisplay || event.button !== 0) return;
+      const handle = event.target.closest('[data-crop-handle]')?.dataset.cropHandle || 'move';
+      cropDrag = { handle, start: pointerToImage(event), initial: { ...cropState } };
+      frame.setPointerCapture?.(event.pointerId);
+      frame.focus();
+      event.preventDefault();
+    });
+    frame.addEventListener('pointermove', (event) => {
+      if (!cropDrag) return;
+      const point = pointerToImage(event);
+      const dx = point.x - cropDrag.start.x;
+      const dy = point.y - cropDrag.start.y;
+      if (cropDrag.handle === 'move') clampCropRect(cropDrag.initial.x + dx, cropDrag.initial.y + dy, cropDrag.initial.width, cropDrag.initial.height, false);
+      else resizeCropFromPointer(cropDrag.handle, dx, dy);
+      syncCropFields();
+      queueCropRender();
+      event.preventDefault();
+    });
+    const finishDrag = () => { cropDrag = null; };
+    frame.addEventListener('pointerup', finishDrag);
+    frame.addEventListener('pointercancel', finishDrag);
+    frame.addEventListener('keydown', (event) => {
+      const step = event.shiftKey ? 10 : 1;
+      const offsets = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+      const offset = offsets[event.key];
+      if (!offset) return;
+      clampCropRect(cropState.x + offset[0], cropState.y + offset[1], cropState.width, cropState.height, false);
+      syncCropFields();
+      queueCropRender();
+      event.preventDefault();
+    });
+  };
+
+  const setStatus = (value, stateClass = '') => { status.textContent = value; status.className = `file-status ${stateClass}`.trim(); };
+  const revokeResult = () => { if (resultUrl) URL.revokeObjectURL(resultUrl); resultUrl = ''; resultBlob = null; downloadButton.disabled = true; };
+  const renderSource = () => {
+    if (!currentImage) {
+      dropzone.hidden = mode === 'base64';
+      sourcePreview.innerHTML = '<div class="file-empty"><span>IMG</span><strong>选择图片开始处理</strong><small>支持点击选择或直接拖放</small></div>';
+      fileMeta.textContent = '尚未选择图片';
+      return;
+    }
+    if (mode === 'crop') {
+      dropzone.hidden = true;
+      sourcePreview.innerHTML = imageCropEditorMarkup();
+      bindCropEditor();
+      initializeCropState();
+      queueCropRender();
+      fileMeta.textContent = `${currentFile.name} · ${currentImage.naturalWidth} × ${currentImage.naturalHeight} · ${formatFileSize(currentFile.size)}`;
+      return;
+    }
+    dropzone.hidden = mode === 'base64';
+    sourcePreview.innerHTML = `<img class="file-preview-image" src="${currentDataUrl}" alt="源图片预览" /><div class="file-preview-overlay"><span>${currentImage.naturalWidth} × ${currentImage.naturalHeight}</span><span>${escapeHtml(currentFile.name)}</span></div>`;
+    fileMeta.textContent = `${currentFile.name} · ${currentImage.naturalWidth} × ${currentImage.naturalHeight} · ${formatFileSize(currentFile.size)}`;
+  };
+  const renderSettings = () => {
+    settingsPanel.innerHTML = imageSettingsMarkup(mode);
+    if (mode === 'resize' && currentImage) {
+      settingsPanel.querySelector('#image-width').value = currentImage.naturalWidth;
+      settingsPanel.querySelector('#image-height').value = currentImage.naturalHeight;
+    }
+    if (mode === 'crop') {
+      initializeCropState();
+      syncCropFields();
+      settingsPanel.querySelectorAll('[data-crop-aspect]').forEach((button) => button.addEventListener('click', () => {
+        cropState.aspect = button.dataset.cropAspect;
+        clampCropRect(cropState.x, cropState.y, cropState.width || currentImage?.naturalWidth, cropState.height || currentImage?.naturalHeight, true);
+        syncCropFields();
+        queueCropRender();
+      }));
+      settingsPanel.querySelectorAll('[data-crop-shape]').forEach((button) => button.addEventListener('click', () => { cropState.shape = button.dataset.cropShape; syncCropFields(); queueCropRender(); }));
+      settingsPanel.querySelectorAll('[data-crop-output]').forEach((button) => button.addEventListener('click', () => { cropState.outputWidth = button.dataset.cropOutput === 'source' ? 0 : Number(button.dataset.cropOutput); syncCropFields(); }));
+      settingsPanel.querySelectorAll('[data-crop-action]').forEach((button) => button.addEventListener('click', () => {
+        const action = button.dataset.cropAction;
+        if (action === 'rotate-left') cropState.angle = Math.max(-180, cropState.angle - 90);
+        if (action === 'rotate-right') cropState.angle = Math.min(180, cropState.angle + 90);
+        if (action === 'flip-x') cropState.flipX = !cropState.flipX;
+        if (action === 'flip-y') cropState.flipY = !cropState.flipY;
+        if (action === 'reset-angle') cropState.angle = 0;
+        syncCropFields();
+        queueCropRender();
+      }));
+      settingsPanel.querySelector('#image-crop-angle')?.addEventListener('input', (event) => { cropState.angle = Number(event.target.value) || 0; syncCropFields(); queueCropRender(); });
+      settingsPanel.querySelector('#image-crop-custom-width')?.addEventListener('input', (event) => { cropState.customWidth = Math.max(1, Number(event.target.value) || 1); if (cropState.aspect === 'custom') clampCropRect(cropState.x, cropState.y, cropState.width, cropState.height, true); syncCropFields(); queueCropRender(); });
+      settingsPanel.querySelector('#image-crop-custom-height')?.addEventListener('input', (event) => { cropState.customHeight = Math.max(1, Number(event.target.value) || 1); if (cropState.aspect === 'custom') clampCropRect(cropState.x, cropState.y, cropState.width, cropState.height, true); syncCropFields(); queueCropRender(); });
+      settingsPanel.querySelectorAll('.image-crop-frame-fields input').forEach((field) => field.addEventListener('input', () => {
+        const x = Number(settingsPanel.querySelector('#image-crop-x')?.value) || 0;
+        const y = Number(settingsPanel.querySelector('#image-crop-y')?.value) || 0;
+        const width = Number(settingsPanel.querySelector('#image-crop-width')?.value) || cropState.width;
+        const height = Number(settingsPanel.querySelector('#image-crop-height')?.value) || cropState.height;
+        clampCropRect(x, y, width, height, field.id.includes('width') || field.id.includes('height'));
+        syncCropFields();
+        queueCropRender();
+      }));
+      settingsPanel.querySelector('#image-crop-output-width')?.addEventListener('input', (event) => { cropState.outputWidth = Math.max(0, Number(event.target.value) || 0); syncCropFields(); });
+    }
+    if (mode === 'base64') syncBase64Direction();
+    settingsPanel.querySelector('#image-quality')?.addEventListener('input', (event) => { settingsPanel.querySelector('#image-quality-value').textContent = event.target.value; });
+    settingsPanel.querySelector('#image-lock-ratio')?.addEventListener('change', () => {});
+    settingsPanel.querySelector('#image-width')?.addEventListener('input', (event) => {
+      const lock = settingsPanel.querySelector('#image-lock-ratio')?.checked;
+      if (lock && currentImage) settingsPanel.querySelector('#image-height').value = Math.max(1, Math.round(Number(event.target.value || 1) * currentImage.naturalHeight / currentImage.naturalWidth));
+    });
+    settingsPanel.querySelector('#image-height')?.addEventListener('input', (event) => {
+      const lock = settingsPanel.querySelector('#image-lock-ratio')?.checked;
+      if (lock && currentImage) settingsPanel.querySelector('#image-width').value = Math.max(1, Math.round(Number(event.target.value || 1) * currentImage.naturalWidth / currentImage.naturalHeight));
+    });
+    settingsPanel.querySelector('#image-base64-direction')?.addEventListener('change', syncBase64Direction);
+  };
+  const syncBase64Direction = () => {
+    const direction = settingsPanel.querySelector('#image-base64-direction')?.value;
+    const inputField = settingsPanel.querySelector('#image-base64-input-field');
+    const sourceCaption = content.querySelector('#image-source-caption');
+    if (inputField) inputField.hidden = direction !== 'base64-to-image';
+    if (sourceCaption) sourceCaption.textContent = direction === 'base64-to-image' ? '无需选择文件，粘贴 Base64 内容' : '支持 PNG、JPEG、WebP、GIF、AVIF';
+  };
+  const setMode = (nextMode) => {
+    mode = nextMode;
+    tabs.querySelectorAll('[data-file-mode]').forEach((tab) => { const selected = tab.dataset.fileMode === mode; tab.classList.toggle('is-active', selected); tab.setAttribute('aria-selected', String(selected)); });
+    workbench.classList.toggle('is-crop-mode', mode === 'crop');
+    fileInput.hidden = mode === 'base64';
+    dropzone.hidden = mode === 'base64';
+    renderSettings();
+    renderSource();
+    revokeResult();
+    resultStage.innerHTML = '<div class="file-empty"><span>↗</span><strong>等待处理结果</strong><small>完成处理后可预览和下载</small></div>';
+    setStatus('等待输入');
+  };
+  const setFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setStatus('请选择图片文件', 'is-error'); return; }
+    fileLoadPromise = (async () => {
+      try {
+        currentFile = file;
+        currentDataUrl = await readFileDataUrl(file);
+        currentImage = await loadImageElement(currentDataUrl);
+        renderSource();
+        renderSettings();
+        revokeResult();
+        setStatus('图片已就绪', 'is-success');
+      } catch (error) { currentFile = null; currentImage = null; setStatus(error.message, 'is-error'); }
+    })();
+    fileLoadPromise.finally(() => { fileLoadPromise = null; });
+    return fileLoadPromise;
+  };
+  const processImage = async () => {
+    try {
+      if (fileLoadPromise) await fileLoadPromise;
+      if (mode === 'base64' && settingsPanel.querySelector('#image-base64-direction')?.value === 'base64-to-image') {
+        const dataUrl = parseImageBase64(settingsPanel.querySelector('#image-base64-input').value);
+        revokeResult();
+        currentDataUrl = dataUrl;
+        currentImage = await loadImageElement(dataUrl);
+        resultBlob = dataUrlToBlob(dataUrl);
+        currentFile = new File([resultBlob], `base64-image.${imageMimeExtension(resultBlob.type)}`, { type: resultBlob.type || 'image/png' });
+        resultUrl = URL.createObjectURL(resultBlob);
+        resultName = `byetools-base64-image.${imageMimeExtension(resultBlob.type)}`;
+        renderSource();
+        resultStage.innerHTML = `<div class="file-output-preview"><img class="file-preview-image" src="${resultUrl}" alt="Base64 图片预览" /><div class="file-output-meta"><strong>${currentImage.naturalWidth} × ${currentImage.naturalHeight}</strong><span>${resultBlob.type || 'image/png'} · ${formatFileSize(resultBlob.size)}</span></div></div>`;
+        resultCaption.textContent = 'Base64 已还原为图片';
+        resultBadge.textContent = 'IMAGE';
+        downloadButton.disabled = false;
+        setStatus('转换完成', 'is-success');
+        return;
+      }
+      if (!currentImage || !currentFile) throw new Error('请先选择一张图片');
+      if (mode === 'base64') {
+        const base64 = currentDataUrl;
+        resultStage.innerHTML = `<div class="file-text-output"><textarea id="image-base64-output" readonly>${escapeHtml(base64)}</textarea><button class="secondary-button" type="button" data-file-action="image-copy-base64">复制 Base64</button></div>`;
+        resultCaption.textContent = `Base64 输出 · ${base64.length} 个字符`;
+        resultBadge.textContent = 'BASE64';
+        resultBlob = new Blob([base64], { type: 'text/plain;charset=utf-8' });
+        resultName = `${currentFile.name.replace(/\.[^.]+$/, '') || 'image'}.base64.txt`;
+        resultUrl = URL.createObjectURL(resultBlob);
+        downloadButton.disabled = false;
+        setStatus('转换完成', 'is-success');
+        content.querySelector('[data-file-action="image-copy-base64"]')?.addEventListener('click', () => copyText(base64).then(() => showToast('Base64 已复制')));
+        return;
+      }
+      const values = mode === 'crop'
+        ? { ...cropState, outputWidth: Number(settingsPanel.querySelector('#image-crop-output-width')?.value) || cropState.outputWidth }
+        : { width: settingsPanel.querySelector('#image-width')?.value, height: settingsPanel.querySelector('#image-height')?.value, fit: settingsPanel.querySelector('#image-fit')?.value };
+      const canvas = mode === 'crop' ? createCropCanvas(currentImage, values) : createImageCanvas(currentImage, mode, values);
+      const outputType = settingsPanel.querySelector('#image-output-format')?.value || 'source';
+      const mime = outputType === 'source' ? currentFile.type || 'image/png' : outputType;
+      const quality = Number(settingsPanel.querySelector('#image-quality')?.value || 90) / 100;
+      let nextBlob;
+      try { nextBlob = await canvasToBlob(canvas, mime, quality); } catch (error) { nextBlob = await canvasToBlob(canvas, 'image/png'); }
+      if (resultUrl) URL.revokeObjectURL(resultUrl);
+      resultUrl = '';
+      resultBlob = nextBlob;
+      resultUrl = URL.createObjectURL(resultBlob);
+      resultName = `${currentFile.name.replace(/\.[^.]+$/, '') || 'image'}.${imageMimeExtension(resultBlob.type)}`;
+      resultStage.innerHTML = `<div class="file-output-preview"><img class="file-preview-image" src="${resultUrl}" alt="处理结果预览" /><div class="file-output-meta"><strong>${canvas.width} × ${canvas.height}</strong><span>${resultBlob.type} · ${formatFileSize(resultBlob.size)}</span></div></div>`;
+      resultCaption.textContent = `${canvas.width} × ${canvas.height} · ${formatFileSize(resultBlob.size)}`;
+      resultBadge.textContent = imageMimeExtension(resultBlob.type).toUpperCase();
+      downloadButton.disabled = false;
+      setStatus('处理完成', 'is-success');
+    } catch (error) { setStatus(error.message, 'is-error'); showToast(error.message); }
+  };
+  tabs.querySelectorAll('[data-file-mode]').forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.fileMode)));
+  fileInput.addEventListener('change', () => setFile(fileInput.files?.[0]));
+  ['dragenter', 'dragover'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add('is-dragging'); }));
+  ['dragleave', 'drop'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove('is-dragging'); if (eventName === 'drop') setFile(event.dataTransfer.files?.[0]); }));
+  processButton.addEventListener('click', processImage);
+  downloadButton.addEventListener('click', () => { if (resultBlob) downloadBlob(resultBlob, resultName); });
+  content.querySelector('[data-file-action="image-clear"]').addEventListener('click', () => { currentFile = null; currentImage = null; currentDataUrl = ''; cropState.sourceFile = null; cropDisplay = null; fileInput.value = ''; revokeResult(); renderSource(); resultStage.innerHTML = '<div class="file-empty"><span>↗</span><strong>等待处理结果</strong><small>完成处理后可预览和下载</small></div>'; setStatus('等待输入'); });
+  window.addEventListener('resize', queueCropRender);
+  renderSettings();
+  activeWorkspaceCleanup = () => { if (resultUrl) URL.revokeObjectURL(resultUrl); window.removeEventListener('resize', queueCropRender); };
+}
+
+function faviconWorkbenchMarkup() {
+  const sizes = [16, 32, 48, 64, 128, 180, 192, 256, 512];
+  return `<div class="file-workbench favicon-workbench"><div class="file-tool-layout"><section class="workspace-card file-source-card"><div class="workspace-card-head"><div><strong>源图片</strong><small>建议使用正方形 PNG 或 SVG 截图</small></div><span class="code-badge">FAVICON</span></div>${fileDropzoneMarkup('favicon-file-input', 'favicon-dropzone', 'image/*')}<div class="file-source-meta" id="favicon-file-meta">尚未选择图片</div><div class="file-preview-frame" id="favicon-source-preview"><div class="file-empty"><span>★</span><strong>选择 Logo 或图片</strong><small>生成网站图标套件</small></div></div></section><section class="workspace-card file-settings-card"><div class="workspace-card-head"><div><strong>图标设置</strong><small>生成常用网站和移动端尺寸</small></div><span class="file-status" id="favicon-status">等待输入</span></div><div class="file-settings"><div class="file-field-grid"><label class="file-field"><span>形状</span><select id="favicon-shape"><option value="square">方形</option><option value="rounded">圆角</option><option value="circle">圆形</option></select></label><label class="file-field"><span>背景颜色</span><input id="favicon-bg" type="color" value="#6366f1" /></label></div><div class="file-inline-options"><label class="file-check"><input id="favicon-transparent" type="checkbox" checked /><span>透明背景</span></label><label class="file-field file-field-inline"><span>内边距 <b id="favicon-padding-value">12%</b></span><input id="favicon-padding" type="range" min="0" max="30" value="12" /></label></div><div class="file-size-heading"><span>输出尺寸</span><small>可同时生成 PNG 和 ICO</small></div><div class="favicon-size-grid">${sizes.map((size) => `<label class="file-check favicon-size-option"><input type="checkbox" value="${size}" ${[16, 32, 48, 180, 192, 512].includes(size) ? 'checked' : ''} /><span>${size} × ${size}</span></label>`).join('')}</div></div><div class="file-action-row"><button class="primary-button" type="button" data-file-action="favicon-generate">生成图标</button><button class="secondary-button" type="button" data-file-action="favicon-clear">清空</button></div></section></div><section class="workspace-card file-result-card"><div class="workspace-card-head"><div><strong>生成结果</strong><small id="favicon-result-caption">等待生成图标</small></div><button class="secondary-button" type="button" data-file-action="favicon-download-ico" disabled>下载 favicon.ico</button></div><div class="favicon-result-grid" id="favicon-results"><div class="file-empty"><span>★</span><strong>选择图片后生成图标</strong><small>每个尺寸都可以单独下载</small></div></div><div class="file-snippet"><div class="file-size-heading"><span>HTML 引用片段</span><button class="text-button" type="button" data-file-action="favicon-copy" disabled>复制</button></div><textarea id="favicon-snippet" readonly placeholder="生成后显示 HTML 引用"></textarea></div></section></div>`;
+}
+
+function drawFaviconCanvas(image, size, options) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+  const radius = options.shape === 'circle' ? size / 2 : options.shape === 'rounded' ? size * .2 : 0;
+  context.save();
+  if (radius) {
+    context.beginPath();
+    if (options.shape === 'circle') context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    else { const r = Math.min(radius, size / 2); context.roundRect(0, 0, size, size, r); }
+    context.clip();
+  }
+  if (!options.transparent) { context.fillStyle = options.background; context.fillRect(0, 0, size, size); }
+  const padding = size * options.padding / 100;
+  const available = size - padding * 2;
+  const scale = Math.min(available / image.naturalWidth, available / image.naturalHeight);
+  const width = image.naturalWidth * scale;
+  const height = image.naturalHeight * scale;
+  context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+  context.restore();
+  return canvas;
+}
+
+async function canvasPngBlob(canvas) { return canvasToBlob(canvas, 'image/png'); }
+
+async function buildIcoBlob(entries) {
+  const usable = entries.filter((entry) => entry.size <= 256);
+  const pngBuffers = await Promise.all(usable.map((entry) => entry.blob.arrayBuffer()));
+  const header = new ArrayBuffer(6);
+  const headerView = new DataView(header);
+  headerView.setUint16(0, 0, true);
+  headerView.setUint16(2, 1, true);
+  headerView.setUint16(4, usable.length, true);
+  const directory = new ArrayBuffer(16 * usable.length);
+  const directoryView = new DataView(directory);
+  let offset = 6 + directory.byteLength;
+  usable.forEach((entry, index) => {
+    const base = index * 16;
+    directoryView.setUint8(base, entry.size >= 256 ? 0 : entry.size);
+    directoryView.setUint8(base + 1, entry.size >= 256 ? 0 : entry.size);
+    directoryView.setUint8(base + 2, 0);
+    directoryView.setUint8(base + 3, 0);
+    directoryView.setUint16(base + 4, 1, true);
+    directoryView.setUint16(base + 6, 32, true);
+    directoryView.setUint32(base + 8, pngBuffers[index].byteLength, true);
+    directoryView.setUint32(base + 12, offset, true);
+    offset += pngBuffers[index].byteLength;
+  });
+  return new Blob([header, directory, ...pngBuffers], { type: 'image/x-icon' });
+}
+
+function bindFaviconWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const fileInput = content.querySelector('#favicon-file-input');
+  const dropzone = content.querySelector('#favicon-dropzone');
+  const sourcePreview = content.querySelector('#favicon-source-preview');
+  const fileMeta = content.querySelector('#favicon-file-meta');
+  const status = content.querySelector('#favicon-status');
+  const resultCaption = content.querySelector('#favicon-result-caption');
+  const results = content.querySelector('#favicon-results');
+  const snippet = content.querySelector('#favicon-snippet');
+  const copyButton = content.querySelector('[data-file-action="favicon-copy"]');
+  const icoButton = content.querySelector('[data-file-action="favicon-download-ico"]');
+  let currentFile = null;
+  let currentDataUrl = '';
+  let currentImage = null;
+  let entries = [];
+  let icoBlob = null;
+  let fileLoadPromise = null;
+  const setStatus = (value, stateClass = '') => { status.textContent = value; status.className = `file-status ${stateClass}`.trim(); };
+  const revokeEntries = () => { entries.forEach((entry) => URL.revokeObjectURL(entry.url)); entries = []; icoBlob = null; icoButton.disabled = true; copyButton.disabled = true; };
+  const renderSource = () => {
+    if (!currentImage) { sourcePreview.innerHTML = '<div class="file-empty"><span>★</span><strong>选择 Logo 或图片</strong><small>生成网站图标套件</small></div>'; fileMeta.textContent = '尚未选择图片'; return; }
+    sourcePreview.innerHTML = `<img class="file-preview-image" src="${currentDataUrl}" alt="Favicon 源图预览" /><div class="file-preview-overlay"><span>${currentImage.naturalWidth} × ${currentImage.naturalHeight}</span><span>${escapeHtml(currentFile.name)}</span></div>`;
+    fileMeta.textContent = `${currentFile.name} · ${currentImage.naturalWidth} × ${currentImage.naturalHeight} · ${formatFileSize(currentFile.size)}`;
+  };
+  const setFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setStatus('请选择图片文件', 'is-error'); return; }
+    fileLoadPromise = (async () => {
+      try { currentFile = file; currentDataUrl = await readFileDataUrl(file); currentImage = await loadImageElement(currentDataUrl); renderSource(); setStatus('图片已就绪', 'is-success'); } catch (error) { currentFile = null; currentImage = null; setStatus(error.message, 'is-error'); }
+    })();
+    fileLoadPromise.finally(() => { fileLoadPromise = null; });
+    return fileLoadPromise;
+  };
+  const generate = async () => {
+    try {
+      if (fileLoadPromise) await fileLoadPromise;
+      if (!currentImage) throw new Error('请先选择一张图片');
+      const sizes = [...content.querySelectorAll('.favicon-size-option input:checked')].map((input) => Number(input.value)).filter(Boolean).sort((a, b) => a - b);
+      if (!sizes.length) throw new Error('请至少选择一个输出尺寸');
+      revokeEntries();
+      const options = { shape: content.querySelector('#favicon-shape').value, background: content.querySelector('#favicon-bg').value, transparent: content.querySelector('#favicon-transparent').checked, padding: Number(content.querySelector('#favicon-padding').value) };
+      entries = [];
+      for (const size of sizes) {
+        const blob = await canvasPngBlob(drawFaviconCanvas(currentImage, size, options));
+        entries.push({ size, blob, url: URL.createObjectURL(blob) });
+      }
+      icoBlob = await buildIcoBlob(entries);
+      icoButton.disabled = false;
+      copyButton.disabled = false;
+      const publicEntries = entries.filter((entry) => [16, 32, 48, 180, 192, 512].includes(entry.size));
+      const lines = ['<link rel="icon" href="/favicon.ico" sizes="any">', ...publicEntries.map((entry) => `<link rel="icon" type="image/png" sizes="${entry.size}x${entry.size}" href="/favicon-${entry.size}x${entry.size}.png">`)];
+      snippet.value = lines.join('\n');
+      results.innerHTML = entries.map((entry, index) => `<article class="favicon-result-item"><img src="${entry.url}" alt="${entry.size} 像素图标"><div><strong>${entry.size} × ${entry.size}</strong><small>${formatFileSize(entry.blob.size)}</small></div><button class="secondary-button" type="button" data-favicon-index="${index}">下载</button></article>`).join('');
+      results.querySelectorAll('[data-favicon-index]').forEach((button) => button.addEventListener('click', () => { const entry = entries[Number(button.dataset.faviconIndex)]; if (entry) downloadBlob(entry.blob, `favicon-${entry.size}x${entry.size}.png`); }));
+      resultCaption.textContent = `已生成 ${entries.length} 个 PNG，并包含 ${icoBlob ? 'favicon.ico' : '无 ICO'}`;
+      setStatus('生成完成', 'is-success');
+    } catch (error) { setStatus(error.message, 'is-error'); showToast(error.message); }
+  };
+  fileInput.addEventListener('change', () => setFile(fileInput.files?.[0]));
+  ['dragenter', 'dragover'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add('is-dragging'); }));
+  ['dragleave', 'drop'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove('is-dragging'); if (eventName === 'drop') setFile(event.dataTransfer.files?.[0]); }));
+  content.querySelector('[data-file-action="favicon-generate"]').addEventListener('click', generate);
+  content.querySelector('#favicon-padding').addEventListener('input', (event) => { content.querySelector('#favicon-padding-value').textContent = `${event.target.value}%`; });
+  icoButton.addEventListener('click', () => { if (icoBlob) downloadBlob(icoBlob, 'favicon.ico'); });
+  copyButton.addEventListener('click', () => copyText(snippet.value).then(() => showToast('HTML 片段已复制')));
+  content.querySelector('[data-file-action="favicon-clear"]').addEventListener('click', () => { currentFile = null; currentImage = null; currentDataUrl = ''; fileInput.value = ''; revokeEntries(); snippet.value = ''; results.innerHTML = '<div class="file-empty"><span>★</span><strong>选择图片后生成图标</strong><small>每个尺寸都可以单独下载</small></div>'; renderSource(); setStatus('等待输入'); });
+  activeWorkspaceCleanup = () => { revokeEntries(); };
+}
+
+const pdfToolModes = [
+  ['merge', 'PDF 合并', '多个文件合成一个'],
+  ['split', 'PDF 拆分', '按页码导出新文件'],
+  ['watermark', 'PDF 水印', '添加文字水印'],
+  ['organize', 'PDF 整理', '拖拽前的页码重排'],
+  ['to-image', 'PDF 转图片', '渲染页面为 PNG'],
+];
+
+function pdfToolsWorkbenchMarkup() {
+  return `<div class="file-workbench pdf-workbench">
+    ${fileModeTabsMarkup('pdf-mode-tabs', pdfToolModes, 'merge')}
+    <div class="file-tool-layout">
+      <section class="workspace-card file-source-card"><div class="workspace-card-head"><div><strong>PDF 文件</strong><small id="pdf-source-caption">合并模式支持选择多个 PDF</small></div><span class="code-badge">PDF</span></div>${fileDropzoneMarkup('pdf-file-input', 'pdf-dropzone', 'application/pdf,.pdf')}<div class="file-source-meta" id="pdf-file-meta">尚未选择 PDF</div><div class="pdf-file-list" id="pdf-file-list"><div class="file-empty"><span>PDF</span><strong>选择 PDF 文件</strong><small>文件只在当前设备处理</small></div></div></section>
+      <section class="workspace-card file-settings-card"><div class="workspace-card-head"><div><strong>处理设置</strong><small id="pdf-settings-caption">选择操作后配置参数</small></div><span class="file-status" id="pdf-status">等待输入</span></div><div class="file-settings" id="pdf-settings"></div><div class="file-action-row"><button class="primary-button" type="button" data-file-action="pdf-process">开始处理</button><button class="secondary-button" type="button" data-file-action="pdf-download" disabled>下载结果</button><button class="secondary-button" type="button" data-file-action="pdf-clear">清空</button></div></section>
+    </div>
+    <section class="workspace-card file-result-card"><div class="workspace-card-head"><div><strong>处理结果</strong><small id="pdf-result-caption">生成结果会显示在这里</small></div><span class="code-badge" id="pdf-result-badge">OUTPUT</span></div><div class="pdf-result-stage" id="pdf-result-stage"><div class="file-empty"><span>↗</span><strong>等待处理结果</strong><small>完成操作后可预览和下载</small></div></div></section>
+  </div>`;
+}
+
+function pdfSettingsMarkup(mode, pageCount = 1) {
+  if (mode === 'merge') return '<p class="file-form-hint">按文件列表顺序合并页面。可以一次选择多个 PDF，也可以重复选择补充文件。</p>';
+  if (mode === 'split') return `<label class="file-field"><span>导出页码</span><input id="pdf-page-selection" type="text" value="1" placeholder="例如：1-3,5" /></label><p class="file-form-hint">当前文件共 ${pageCount} 页，支持单页、范围和逗号组合。</p>`;
+  if (mode === 'watermark') return `<label class="file-field"><span>水印文字</span><input id="pdf-watermark-text" type="text" value="仅供内部使用" maxlength="80" /></label><div class="file-field-grid"><label class="file-field"><span>字体大小</span><input id="pdf-watermark-size" type="number" min="8" max="120" value="40" /></label><label class="file-field"><span>透明度 <b id="pdf-watermark-opacity-value">35%</b></span><input id="pdf-watermark-opacity" type="range" min="5" max="100" value="35" /></label></div><div class="file-field-grid"><label class="file-field"><span>颜色</span><input id="pdf-watermark-color" type="color" value="#64748b" /></label><label class="file-field"><span>旋转角度</span><input id="pdf-watermark-rotation" type="number" min="-180" max="180" value="-25" /></label></div><p class="file-form-hint">水印会以居中、半透明文字绘制到每一页。</p>`;
+  if (mode === 'organize') return `<label class="file-field"><span>新页码顺序</span><input id="pdf-page-selection" type="text" value="${Array.from({ length: pageCount }, (_, index) => index + 1).join(',')}" placeholder="例如：2,1,3-5" /></label><p class="file-form-hint">支持重排、重复和删除页面。未填写的页码不会出现在结果中。</p>`;
+  return `<div class="file-field-grid"><label class="file-field"><span>渲染页码</span><input id="pdf-page-selection" type="text" value="1" placeholder="例如：1-2,5" /></label><label class="file-field"><span>缩放倍数</span><select id="pdf-render-scale"><option value="1">1× 标准</option><option value="1.5" selected>1.5× 清晰</option><option value="2">2× 高清</option><option value="3">3× 超清</option></select></label></div><p class="file-form-hint">每页生成一张 PNG，页码支持单页、范围和逗号组合。</p>`;
+}
+
+function parsePageSelection(value, pageCount) {
+  const result = [];
+  const tokens = String(value || '').split(',').map((token) => token.trim()).filter(Boolean);
+  if (!tokens.length) throw new Error('请输入要处理的页码');
+  tokens.forEach((token) => {
+    const range = token.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (range) {
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      if (start < 1 || end < start || end > pageCount) throw new Error(`页码范围 ${token} 超出 1-${pageCount}`);
+      for (let page = start; page <= end; page += 1) if (!result.includes(page - 1)) result.push(page - 1);
+      return;
+    }
+    const page = Number(token);
+    if (!Number.isInteger(page) || page < 1 || page > pageCount) throw new Error(`页码 ${token} 超出 1-${pageCount}`);
+    if (!result.includes(page - 1)) result.push(page - 1);
+  });
+  return result;
+}
+
+function pdfColorFromHex(value) {
+  const normalized = String(value || '').replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) return rgb(.39, .45, .55);
+  return rgb(Number.parseInt(normalized.slice(0, 2), 16) / 255, Number.parseInt(normalized.slice(2, 4), 16) / 255, Number.parseInt(normalized.slice(4, 6), 16) / 255);
+}
+
+function renderPdfResultLinks(entries) {
+  return entries.map((entry, index) => `<article class="pdf-result-item"><div class="pdf-result-thumb">${entry.previewUrl ? `<img src="${entry.previewUrl}" alt="${escapeHtml(entry.name)} 预览">` : '<span>PDF</span>'}</div><div class="pdf-result-copy"><strong>${escapeHtml(entry.name)}</strong><small>${escapeHtml(entry.meta || '')}</small></div><button class="secondary-button" type="button" data-pdf-result-index="${index}">下载</button></article>`).join('');
+}
+
+function bindPdfToolsWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const tabs = content.querySelector('#pdf-mode-tabs');
+  const settingsPanel = content.querySelector('#pdf-settings');
+  const fileInput = content.querySelector('#pdf-file-input');
+  const dropzone = content.querySelector('#pdf-dropzone');
+  const fileMeta = content.querySelector('#pdf-file-meta');
+  const fileList = content.querySelector('#pdf-file-list');
+  const status = content.querySelector('#pdf-status');
+  const resultCaption = content.querySelector('#pdf-result-caption');
+  const resultBadge = content.querySelector('#pdf-result-badge');
+  const resultStage = content.querySelector('#pdf-result-stage');
+  const processButton = content.querySelector('[data-file-action="pdf-process"]');
+  const downloadButton = content.querySelector('[data-file-action="pdf-download"]');
+  let mode = 'merge';
+  let documents = [];
+  let resultEntries = [];
+  let resultBlob = null;
+  let resultName = '';
+  const setStatus = (value, stateClass = '') => { status.textContent = value; status.className = `file-status ${stateClass}`.trim(); };
+  const revokeResults = () => { resultEntries.forEach((entry) => { if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl); }); resultEntries = []; resultBlob = null; downloadButton.disabled = true; };
+  const renderFileList = () => {
+    if (!documents.length) { fileList.innerHTML = '<div class="file-empty"><span>PDF</span><strong>选择 PDF 文件</strong><small>文件只在当前设备处理</small></div>'; fileMeta.textContent = '尚未选择 PDF'; return; }
+    fileList.innerHTML = documents.map((document, index) => `<div class="pdf-file-item"><span class="pdf-file-index">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(document.file.name)}</strong><small>${document.pageCount} 页 · ${formatFileSize(document.file.size)}</small></div><button class="icon-button" type="button" data-pdf-remove="${index}" title="移除文件" aria-label="移除 ${escapeHtml(document.file.name)}">×</button></div>`).join('');
+    fileList.querySelectorAll('[data-pdf-remove]').forEach((button) => button.addEventListener('click', () => { documents.splice(Number(button.dataset.pdfRemove), 1); renderFileList(); updateSettings(); }));
+    fileMeta.textContent = `${documents.length} 个 PDF · ${documents.reduce((sum, document) => sum + document.pageCount, 0)} 页`;
+  };
+  const updateSettings = () => {
+    settingsPanel.innerHTML = pdfSettingsMarkup(mode, documents[0]?.pageCount || 1);
+    content.querySelector('#pdf-source-caption').textContent = mode === 'merge' ? '合并模式支持选择多个 PDF' : '当前模式使用第一个 PDF';
+    if (mode === 'watermark') content.querySelector('#pdf-watermark-opacity')?.addEventListener('input', (event) => { content.querySelector('#pdf-watermark-opacity-value').textContent = `${event.target.value}%`; });
+  };
+  const setMode = (nextMode) => {
+    mode = nextMode;
+    tabs.querySelectorAll('[data-file-mode]').forEach((tab) => { const selected = tab.dataset.fileMode === mode; tab.classList.toggle('is-active', selected); tab.setAttribute('aria-selected', String(selected)); });
+    fileInput.multiple = mode === 'merge';
+    revokeResults();
+    resultStage.innerHTML = '<div class="file-empty"><span>↗</span><strong>等待处理结果</strong><small>完成操作后可预览和下载</small></div>';
+    updateSettings();
+    setStatus('等待输入');
+  };
+  const setFiles = async (files) => {
+    const selected = [...files].filter((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+    if (!selected.length) { setStatus('请选择 PDF 文件', 'is-error'); return; }
+    const filesToLoad = mode === 'merge' ? selected : selected.slice(0, 1);
+    try {
+      const loaded = [];
+      for (const file of filesToLoad) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const source = await PDFDocument.load(bytes);
+        loaded.push({ file, bytes, pageCount: source.getPageCount() });
+      }
+      documents = mode === 'merge' ? [...documents, ...loaded] : loaded;
+      renderFileList();
+      updateSettings();
+      setStatus('PDF 已就绪', 'is-success');
+    } catch (error) { setStatus(`读取失败：${error.message}`, 'is-error'); showToast(`PDF 读取失败：${error.message}`); }
+  };
+  const makePdfBlob = async (build) => { const document = await PDFDocument.create(); await build(document); return new Blob([await document.save()], { type: 'application/pdf' }); };
+  const processPdf = async () => {
+    try {
+      if (!documents.length) throw new Error('请先选择 PDF 文件');
+      revokeResults();
+      if (mode === 'merge') {
+        if (documents.length < 2) throw new Error('合并至少需要选择两个 PDF');
+        resultBlob = await makePdfBlob(async (target) => { for (const document of documents) { const source = await PDFDocument.load(document.bytes); const pages = await target.copyPages(source, source.getPageIndices()); pages.forEach((page) => target.addPage(page)); } });
+        resultName = 'byetools-merged.pdf';
+        resultEntries = [{ name: resultName, meta: `${documents.length} 个文件 · ${documents.reduce((sum, document) => sum + document.pageCount, 0)} 页` }];
+      } else if (mode === 'split' || mode === 'organize') {
+        const sourceInfo = documents[0];
+        const selection = parsePageSelection(settingsPanel.querySelector('#pdf-page-selection').value, sourceInfo.pageCount);
+        resultBlob = await makePdfBlob(async (target) => { const source = await PDFDocument.load(sourceInfo.bytes); const pages = await target.copyPages(source, selection); pages.forEach((page) => target.addPage(page)); });
+        resultName = mode === 'split' ? 'byetools-split.pdf' : 'byetools-organized.pdf';
+        resultEntries = [{ name: resultName, meta: `${selection.length} 页 · 原文件 ${sourceInfo.pageCount} 页` }];
+      } else if (mode === 'watermark') {
+        const sourceInfo = documents[0];
+        const text = settingsPanel.querySelector('#pdf-watermark-text').value.trim();
+        if (!text) throw new Error('请输入水印文字');
+        resultBlob = await makePdfBlob(async (target) => {
+          const source = await PDFDocument.load(sourceInfo.bytes);
+          const size = Number(settingsPanel.querySelector('#pdf-watermark-size').value) || 40;
+          const opacity = Number(settingsPanel.querySelector('#pdf-watermark-opacity').value) / 100;
+          const color = settingsPanel.querySelector('#pdf-watermark-color').value;
+          const rotation = Number(settingsPanel.querySelector('#pdf-watermark-rotation').value) || 0;
+          const watermarkCanvas = document.createElement('canvas');
+          const watermarkContext = watermarkCanvas.getContext('2d');
+          watermarkContext.font = `700 ${size * 2}px Arial, sans-serif`;
+          const textWidth = Math.ceil(watermarkContext.measureText(text).width);
+          watermarkCanvas.width = Math.max(180, textWidth + size * 2);
+          watermarkCanvas.height = Math.max(80, size * 3);
+          watermarkContext.font = `700 ${size * 2}px Arial, sans-serif`;
+          watermarkContext.textAlign = 'center';
+          watermarkContext.textBaseline = 'middle';
+          watermarkContext.fillStyle = `${color}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`;
+          watermarkContext.fillText(text, watermarkCanvas.width / 2, watermarkCanvas.height / 2);
+          const watermarkImage = await target.embedPng(watermarkCanvas.toDataURL('image/png'));
+          const pages = await target.copyPages(source, source.getPageIndices());
+          pages.forEach((page) => { target.addPage(page); const pageSize = page.getSize(); const scale = Math.min((pageSize.width * .72) / watermarkCanvas.width, (pageSize.height * .72) / watermarkCanvas.height); const width = watermarkCanvas.width * scale; const height = watermarkCanvas.height * scale; page.drawImage(watermarkImage, { x: (pageSize.width - width) / 2, y: (pageSize.height - height) / 2, width, height, rotate: degrees(rotation) }); });
+        });
+        resultName = 'byetools-watermarked.pdf';
+        resultEntries = [{ name: resultName, meta: `${sourceInfo.pageCount} 页 · 已添加文字水印` }];
+      } else {
+        const sourceInfo = documents[0];
+        const selection = parsePageSelection(settingsPanel.querySelector('#pdf-page-selection').value, sourceInfo.pageCount);
+        const scale = Number(settingsPanel.querySelector('#pdf-render-scale').value) || 1.5;
+        const loadingTask = pdfjsLib.getDocument({ data: sourceInfo.bytes.slice() });
+        const pdf = await loadingTask.promise;
+        resultEntries = [];
+        for (const pageIndex of selection) {
+          const page = await pdf.getPage(pageIndex + 1);
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          const blob = await canvasPngBlob(canvas);
+          resultEntries.push({ blob, previewUrl: URL.createObjectURL(blob), name: `page-${pageIndex + 1}.png`, meta: `${canvas.width} × ${canvas.height}` });
+        }
+        resultName = resultEntries.length === 1 ? `byetools-page-${selection[0] + 1}.png` : '';
+      }
+      if (mode === 'to-image') {
+        resultStage.innerHTML = renderPdfResultLinks(resultEntries);
+        resultStage.querySelectorAll('[data-pdf-result-index]').forEach((button) => button.addEventListener('click', () => { const entry = resultEntries[Number(button.dataset.pdfResultIndex)]; if (entry?.blob) downloadBlob(entry.blob, entry.name); }));
+        resultCaption.textContent = `已生成 ${resultEntries.length} 张 PNG`;
+        resultBadge.textContent = 'PNG';
+        downloadButton.disabled = resultEntries.length === 0;
+      } else {
+        resultStage.innerHTML = renderPdfResultLinks(resultEntries);
+        resultCaption.textContent = resultEntries[0].meta;
+        resultBadge.textContent = 'PDF';
+        downloadButton.disabled = !resultBlob;
+      }
+      setStatus('处理完成', 'is-success');
+    } catch (error) { setStatus(error.message, 'is-error'); showToast(error.message); }
+  };
+  tabs.querySelectorAll('[data-file-mode]').forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.fileMode)));
+  fileInput.addEventListener('change', () => setFiles(fileInput.files));
+  ['dragenter', 'dragover'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add('is-dragging'); }));
+  ['dragleave', 'drop'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove('is-dragging'); if (eventName === 'drop') setFiles(event.dataTransfer.files); }));
+  processButton.addEventListener('click', processPdf);
+  downloadButton.addEventListener('click', () => { if (mode === 'to-image') resultEntries.forEach((entry) => { if (entry.blob) downloadBlob(entry.blob, entry.name); }); else if (resultBlob) downloadBlob(resultBlob, resultName); });
+  content.querySelector('[data-file-action="pdf-clear"]').addEventListener('click', () => { documents = []; fileInput.value = ''; revokeResults(); renderFileList(); updateSettings(); resultStage.innerHTML = '<div class="file-empty"><span>↗</span><strong>等待处理结果</strong><small>完成操作后可预览和下载</small></div>'; setStatus('等待输入'); });
+  fileInput.multiple = true;
+  updateSettings();
+  activeWorkspaceCleanup = () => { revokeResults(); };
+}
+
 function diffLineRows(leftLines, rightLines) {
   const rows = [];
   const table = Array.from({ length: leftLines.length + 1 }, () => Array(rightLines.length + 1).fill(0));
@@ -2223,6 +3583,22 @@ function downloadTextFile(value, name, type = 'text/plain;charset=utf-8') {
   link.download = name;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function csvCell(value) {
@@ -2604,6 +3980,8 @@ const btSelectIconDefinitions = {
   'markdown-theme': ['M', 'icon-html'],
   'markdown-size': ['Aa', 'icon-html'],
   'random-type': ['⌁', 'icon-random'],
+  'qrbc-qr-level': ['QR', 'icon-qr-barcode'],
+  'qrbc-barcode-format': ['BAR', 'icon-qr-barcode'],
   'random-charset': ['Aa', 'icon-random'],
   'random-uuid-case': ['ID', 'icon-random'],
   'uuid-case': ['ID', 'icon-random'],
@@ -3810,6 +5188,11 @@ function bindWorkspace(tool) {
   if (tool.id === 'html') { bindHtmlWorkspace(); return; }
   if (tool.id === 'mermaid') { bindMermaidWorkspace(); return; }
   if (tool.id === 'markdown-image') { bindMarkdownImageWorkspace(); return; }
+  if (tool.id === 'markdown-editor') { bindMarkdownEditorWorkspace(); return; }
+  if (tool.id === 'image-tools') { bindImageToolsWorkspace(); return; }
+  if (tool.id === 'qr-barcode') { bindQrBarcodeWorkspace(); return; }
+  if (tool.id === 'favicon') { bindFaviconWorkspace(); return; }
+  if (tool.id === 'pdf-tools') { bindPdfToolsWorkspace(); return; }
   if (tool.id === 'diff') { bindDiffWorkspace(); return; }
   if (tool.id === 'cron') { bindCronWorkspace(); return; }
   const content = refs.workspace.querySelector('#workspace-content');
