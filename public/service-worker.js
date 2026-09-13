@@ -1,4 +1,4 @@
-const CACHE_NAME = 'byetools-20260911-v2';
+const CACHE_NAME = 'byetools-20260913-v4';
 const CORE_FILES = ['./', './index.html'];
 
 self.addEventListener('install', (event) => {

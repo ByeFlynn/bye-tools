@@ -3,12 +3,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    crypto::{decrypt, draft_aad, encrypt, CRYPTO_VERSION},
+    crypto::{CRYPTO_VERSION, decrypt, draft_aad, encrypt},
     error::{AppError, AppResult},
     state::AppState,
 };
@@ -17,7 +17,7 @@ pub mod crypto_config;
 
 const INITIAL_MIGRATION: &str = include_str!("../../migrations/001_initial.sql");
 const SCHEMA_VERSION: i64 = 1;
-const SETTING_KEYS: [&str; 9] = [
+const SETTING_KEYS: [&str; 10] = [
     "theme-mode",
     "menu-layout",
     "density",
@@ -27,10 +27,16 @@ const SETTING_KEYS: [&str; 9] = [
     "json-auto-decode",
     "json-node-edit",
     "json-nested",
+    "mq-configs",
 ];
-const TOOL_IDS: [&str; 44] = [
+const TOOL_IDS: [&str; 57] = [
     "json",
+    "json-to-types",
+    "xml-format",
+    "xml-converter",
+    "sql-format",
     "base64",
+    "qr-barcode",
     "time",
     "url",
     "md5",
@@ -42,8 +48,11 @@ const TOOL_IDS: [&str; 44] = [
     "aes",
     "des",
     "3des",
+    "rsa",
     "unicode",
     "ip",
+    "message-queue",
+    "linux-commands",
     "html",
     "regex",
     "random",
@@ -52,6 +61,11 @@ const TOOL_IDS: [&str; 44] = [
     "diff",
     "mermaid",
     "markdown-image",
+    "markdown-editor",
+    "mindmap",
+    "image-tools",
+    "favicon",
+    "pdf-tools",
     "jwt",
     "curl",
     "cron",
@@ -476,6 +490,7 @@ fn validate_setting_value(key: &str, value: &Value) -> AppResult<()> {
         "json-sort" => value
             .as_str()
             .is_some_and(|value| ["default", "asc", "desc"].contains(&value)),
+        "mq-configs" => validate_mq_configs(value),
         _ => value.is_boolean(),
     };
     if valid {
@@ -483,6 +498,86 @@ fn validate_setting_value(key: &str, value: &Value) -> AppResult<()> {
     } else {
         Err(AppError::InvalidField("设置值无效".into()))
     }
+}
+
+fn validate_mq_configs(value: &Value) -> bool {
+    let Some(configs) = value.as_array() else {
+        return false;
+    };
+    let allowed_fields = [
+        "id",
+        "name",
+        "broker",
+        "address",
+        "port",
+        "username",
+        "tls",
+        "topic",
+        "qos",
+        "retain",
+        "group",
+        "partition",
+        "exchange",
+        "queue",
+        "routingKey",
+        "tag",
+        "savedAt",
+    ];
+    configs.len() <= 20
+        && serde_json::to_vec(value).is_ok_and(|encoded| encoded.len() <= 128 * 1024)
+        && configs.iter().all(|config| {
+            let Some(fields) = config.as_object() else {
+                return false;
+            };
+            if fields
+                .keys()
+                .any(|key| !allowed_fields.contains(&key.as_str()))
+            {
+                return false;
+            }
+            let broker_valid = fields
+                .get("broker")
+                .and_then(Value::as_str)
+                .is_some_and(|broker| ["mqtt", "kafka", "rabbitmq", "rocketmq"].contains(&broker));
+            let identity_valid = ["id", "name", "address", "port"].iter().all(|key| {
+                fields
+                    .get(*key)
+                    .and_then(Value::as_str)
+                    .is_some_and(|field| !field.is_empty() && field.len() <= 512)
+            });
+            let port_valid = fields
+                .get("port")
+                .and_then(Value::as_str)
+                .and_then(|port| port.parse::<u16>().ok())
+                .is_some_and(|port| port > 0);
+            let strings_valid = [
+                "username",
+                "topic",
+                "qos",
+                "group",
+                "partition",
+                "exchange",
+                "queue",
+                "routingKey",
+                "tag",
+            ]
+            .iter()
+            .all(|key| {
+                fields
+                    .get(*key)
+                    .is_none_or(|field| field.as_str().is_some_and(|text| text.len() <= 4096))
+            });
+            let booleans_valid = ["tls", "retain"]
+                .iter()
+                .all(|key| fields.get(*key).is_none_or(Value::is_boolean));
+            let timestamp_valid = fields.get("savedAt").is_none_or(Value::is_number);
+            broker_valid
+                && identity_valid
+                && port_valid
+                && strings_valid
+                && booleans_valid
+                && timestamp_valid
+        })
 }
 
 pub fn validate_tool_id(tool_id: &str) -> AppResult<()> {
@@ -567,7 +662,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        credentials::{tests::MemoryCredentialProvider, CredentialProvider},
+        credentials::{CredentialProvider, tests::MemoryCredentialProvider},
         crypto::{CryptoConfigField, CryptoConfigPayload, CryptoConfigWriteInput},
         storage::crypto_config,
     };
@@ -622,6 +717,73 @@ mod tests {
     }
 
     #[test]
+    fn mq_configs_are_persisted_without_passwords() {
+        let (_directory, _credentials, state) = create_state();
+        let configs = json!([{
+            "id": "mq-local",
+            "name": "本地 MQTT",
+            "broker": "mqtt",
+            "address": "localhost",
+            "port": "1883",
+            "topic": "byetools/demo"
+        }]);
+        set_setting(&state, "mq-configs", &configs).expect("消息队列配置应写入成功");
+        assert_eq!(
+            get_setting(&state, "mq-configs").expect("消息队列配置应读取成功"),
+            Some(configs)
+        );
+
+        let unsafe_configs = json!([{
+            "id": "mq-unsafe",
+            "name": "不安全配置",
+            "broker": "mqtt",
+            "address": "localhost",
+            "port": "1883",
+            "password": "secret"
+        }]);
+        assert!(matches!(
+            set_setting(&state, "mq-configs", &unsafe_configs),
+            Err(AppError::InvalidField(_))
+        ));
+
+        let disguised_secret = json!([{
+            "id": "mq-unsafe-alias",
+            "name": "不安全别名配置",
+            "broker": "mqtt",
+            "address": "localhost",
+            "port": "1883",
+            "secret": "secret"
+        }]);
+        assert!(matches!(
+            set_setting(&state, "mq-configs", &disguised_secret),
+            Err(AppError::InvalidField(_))
+        ));
+    }
+
+    #[test]
+    fn mq_configs_accept_rocketmq_fields() {
+        let (_directory, _credentials, state) = create_state();
+        let configs = json!([{
+            "id": "mq-rocket",
+            "name": "RocketMQ 测试",
+            "broker": "rocketmq",
+            "address": "localhost",
+            "port": "8081",
+            "username": "access-key",
+            "tls": false,
+            "topic": "ByeToolsTopic",
+            "tag": "TagA || TagB",
+            "group": "byetools-consumer"
+        }]);
+
+        set_setting(&state, "mq-configs", &configs).expect("RocketMQ 配置应写入成功");
+        assert_eq!(
+            get_setting(&state, "mq-configs").expect("RocketMQ 配置应读取成功"),
+            Some(configs)
+        );
+    }
+
+    #[test]
     fn config_list_is_masked_and_aad_tamper_fails() {
         let (_directory, _credentials, state) = create_state();
         let summary =
@@ -662,14 +824,18 @@ mod tests {
         let report = crypto_config::rotate_key(&state, 2).expect("密钥轮换应成功");
         assert_eq!(report.rotated_configs, 1);
         assert_eq!(report.rotated_drafts, 1);
-        assert!(credentials
-            .get("data-key-v1")
-            .expect("凭证读取应成功")
-            .is_none());
-        assert!(credentials
-            .get("data-key-v2")
-            .expect("凭证读取应成功")
-            .is_some());
+        assert!(
+            credentials
+                .get("data-key-v1")
+                .expect("凭证读取应成功")
+                .is_none()
+        );
+        assert!(
+            credentials
+                .get("data-key-v2")
+                .expect("凭证读取应成功")
+                .is_some()
+        );
         assert!(crypto_config::apply(&state, "aes", &summary.id).is_ok());
         assert_eq!(
             get_draft(&state, "aes")
@@ -681,8 +847,10 @@ mod tests {
         checkpoint(&state.lock_database().expect("数据库锁应可用")).expect("检查点应执行成功");
         let database_bytes =
             std::fs::read(directory.path().join("byetools.db")).expect("数据库文件应可读取");
-        assert!(!database_bytes
-            .windows(b"sensitive-draft-value".len())
-            .any(|window| window == b"sensitive-draft-value"));
+        assert!(
+            !database_bytes
+                .windows(b"sensitive-draft-value".len())
+                .any(|window| window == b"sensitive-draft-value")
+        );
     }
 }

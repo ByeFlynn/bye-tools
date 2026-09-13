@@ -126,10 +126,11 @@
 
             <div class="sidebar-heading">工具分类</div>
             <nav class="category-nav" aria-label="工具分类">
-              <button class="nav-item category-item" type="button" data-category="data-format"><span class="nav-icon">◌</span><span>JSON 工具</span><span class="nav-chevron">›</span></button>
               <button class="nav-item category-item" type="button" data-category="encoding"><span class="nav-icon">◈</span><span>编码转换</span><span class="nav-chevron">›</span></button>
               <button class="nav-item category-item" type="button" data-category="crypto"><span class="nav-icon">▣</span><span>加密解密</span><span class="nav-chevron">›</span></button>
               <button class="nav-item category-item" type="button" data-category="network"><span class="nav-icon">⌁</span><span>网络工具</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="message-queue"><span class="nav-icon">MQ</span><span>消息队列</span><span class="nav-chevron">›</span></button>
+              <button class="nav-item category-item" type="button" data-category="cheatsheet"><span class="nav-icon">&gt;_</span><span>速查工具</span><span class="nav-chevron">›</span></button>
               <button class="nav-item category-item" type="button" data-category="format"><span class="nav-icon">✣</span><span>格式化工具</span><span class="nav-chevron">›</span></button>
               <button class="nav-item category-item" type="button" data-category="helper"><span class="nav-icon">♧</span><span>开发辅助</span><span class="nav-chevron">›</span></button>
               <button class="nav-item category-item" type="button" data-category="text"><span class="nav-icon">▤</span><span>文本工具</span><span class="nav-chevron">›</span></button>
@@ -177,7 +178,7 @@
               <div class="section-heading tools-heading">
                 <div>
                   <h2>所有工具</h2>
-                  <p id="result-summary">50 个工具，覆盖开发日常任务</p>
+                  <p id="result-summary">57 个工具，覆盖开发日常任务</p>
                 </div>
                 <button class="filter-button" type="button" data-action="filter" aria-expanded="false"><span aria-hidden="true">⌘</span> 更多筛选</button>
               </div>
@@ -189,10 +190,12 @@
               <div class="filter-tabs" id="filter-tabs" role="tablist" aria-label="工具筛选">
                 <button class="filter-tab active" type="button" data-filter="all">全部</button>
                 <button class="filter-tab" type="button" data-filter="recent">最近使用</button>
-                <button class="filter-tab" type="button" data-filter="data-format">JSON 工具</button>
+                <button class="filter-tab" type="button" data-filter="format">格式化工具</button>
                 <button class="filter-tab" type="button" data-filter="encoding">编码转换</button>
                 <button class="filter-tab" type="button" data-filter="crypto">加密解密</button>
                 <button class="filter-tab" type="button" data-filter="network">网络工具</button>
+                <button class="filter-tab" type="button" data-filter="message-queue">消息队列</button>
+                <button class="filter-tab" type="button" data-filter="cheatsheet">速查工具</button>
                 <button class="filter-tab" type="button" data-filter="helper">开发辅助</button>
                 <button class="filter-tab" type="button" data-filter="text">文本工具</button>
                 <button class="filter-tab" type="button" data-filter="design">设计工具</button>

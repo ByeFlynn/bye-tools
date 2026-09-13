@@ -4,7 +4,7 @@ import { PDFDocument } from 'pdf-lib';
 test('首页展示完整工具目录并支持搜索', async ({ page, isMobile }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '欢迎使用 ByeTools' })).toBeVisible();
-  await expect(page.locator('.tool-card')).toHaveCount(50);
+  await expect(page.locator('.tool-card')).toHaveCount(57);
   if (isMobile) {
     await page.keyboard.press('Control+k');
     await page.locator('#palette-input').fill('Base64');
@@ -20,6 +20,204 @@ test('URL 和 HTML 工具卡片显示正确图标', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.tool-card[data-tool-id="url"] .tool-icon')).toHaveText('URL');
   await expect(page.locator('.tool-card[data-tool-id="html"] .tool-icon')).toHaveText('</>');
+  await page.locator('.tool-card[data-tool-id="html"]').click();
+  await expect(page.locator('#workspace-category')).toHaveText('编码转换');
+});
+
+test('正则表达式测试支持常用模板和核心语法速查', async ({ page }) => {
+  await page.goto('/#/tool/regex');
+  await expect(page.getByRole('heading', { name: '正则表达式测试' })).toBeVisible();
+  await expect(page.locator('.regex-preset')).toHaveCount(10);
+  await expect(page.locator('.regex-syntax-item')).toHaveCount(15);
+  await expect(page.locator('.regex-helper-panel')).toContainText('核心语法速查');
+  await expect(page.locator('#tool-input')).toBeVisible();
+  await expect(page.locator('.regex-helper-section').nth(0)).not.toHaveAttribute('open', '');
+  await expect(page.locator('.regex-helper-section').nth(1)).not.toHaveAttribute('open', '');
+  await page.locator('.regex-helper-section').first().locator('summary').click();
+  await expect(page.locator('.regex-helper-section').first()).toHaveAttribute('open', '');
+
+  await page.locator('[data-regex-preset="email"]').click();
+  await expect(page.locator('#regex-pattern')).toHaveValue('^[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}$');
+  await expect(page.locator('[data-regex-preset="email"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#tool-input').fill('test@example.com');
+  await expect(page.locator('#tool-output')).toContainText('test@example.com');
+  await expect(page.locator('#tool-status')).toHaveText('匹配 1 处');
+
+  await page.locator('[data-regex-preset="digits"]').click();
+  await expect(page.locator('#regex-pattern')).toHaveValue('^\\d+$');
+  await expect(page.locator('[data-regex-preset="email"]')).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('#tool-input').fill('20260913');
+  await expect(page.locator('#tool-output')).toContainText('20260913');
+  await expect(page.locator('#tool-status')).toHaveText('匹配 1 处');
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test('JSON 转类型生成器支持代码编辑、语言切换和本地导出', async ({ page }, testInfo) => {
+  test.setTimeout(45_000);
+  await page.goto('/#/tool/json-to-types');
+  await expect(page.getByRole('heading', { name: 'JSON 转类型生成器' })).toBeVisible();
+  await expect(page.locator('.json-types-workbench .cm-editor')).toHaveCount(2, { timeout: 20_000 });
+  await expect(page.locator('#json-types-status')).toContainText('Java 类型已生成', { timeout: 20_000 });
+  await expect(page.locator('#json-types-output .cm-content')).toContainText('class Root');
+  const languagePicker = page.locator('[data-bt-select="json-types-language"]');
+  await languagePicker.locator('[data-bt-select-toggle]').click();
+  await expect(languagePicker.locator('[data-bt-select-option]')).toHaveCount(24);
+  await expect(languagePicker.locator('[data-bt-select-option]').first().locator('.bt-select-icon')).toHaveText('JV');
+  await expect(languagePicker.locator('[data-bt-select-option]').first().locator('small')).toHaveText('类、字段与 JSON 绑定');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-json-types-action="fullscreen"]').click();
+  await expect(page.locator('#json-types-workbench')).toHaveClass(/is-fullscreen/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#json-types-workbench')).not.toHaveClass(/is-fullscreen/);
+
+  const jsonFile = Buffer.from('[{"id":1,"profile":{"name":"A"},"tags":["one"]},{"id":2,"profile":{"name":"B","verified":true},"tags":["two"]}]', 'utf8');
+  await page.locator('#json-types-file-input').setInputFiles({ name: 'response.json', mimeType: 'application/json', buffer: jsonFile });
+  await page.locator('#json-types-root').fill('ApiResponse');
+  await page.locator('#json-types-language').selectOption('typescript');
+  await expect(page.locator('#json-types-language-badge')).toHaveText('TypeScript');
+  await expect(page.locator('#json-types-status')).toContainText('TypeScript 类型已生成', { timeout: 20_000 });
+  const output = page.locator('#json-types-output .cm-content');
+  await expect(output).toContainText('APIResponse');
+  await expect(output).toContainText('Profile');
+  await expect(output).toContainText('verified?');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('[data-json-types-action="download"]').click();
+  expect((await downloadPromise).suggestedFilename()).toBe('ApiResponse.ts');
+
+  const languages = await page.locator('#json-types-language option').evaluateAll((options) => options.map((option) => ({ value: option.value, label: option.dataset.label })));
+  expect(languages).toHaveLength(24);
+  for (const language of languages) {
+    await page.locator('#json-types-language').selectOption(language.value);
+    await expect(page.locator('#json-types-status')).toContainText(`${language.label} 类型已生成`, { timeout: 20_000 });
+    await expect(page.locator('#json-types-output .cm-content')).not.toBeEmpty();
+  }
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  const columns = await page.locator('.json-types-editor-layout').evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+  expect(columns).toBe(testInfo.project.name === '移动端' ? 1 : 2);
+});
+
+test('消息中间件工作台支持协议切换和桌面能力提示', async ({ page, isMobile }) => {
+  await page.goto('/');
+  await page.locator('.tool-card[data-tool-id="message-queue"]').click();
+  await expect(page.getByRole('heading', { name: '消息中间件' })).toBeVisible();
+  await expect(page.locator('#workspace-category')).toHaveText('消息队列');
+  await expect(page.locator('#mq-broker')).toHaveValue('mqtt');
+  await expect(page.locator('#mq-topic')).toHaveValue('byetools/demo');
+  const brokerPicker = page.locator('[data-bt-select="mq-broker"]');
+  await brokerPicker.locator('[data-bt-select-toggle]').click();
+  await brokerPicker.locator('[data-bt-select-option="kafka"], [data-bt-select-value="kafka"]').click();
+  await expect(page.locator('#mq-topic')).toHaveValue('byetools.events');
+  await expect(page.locator('#mq-group')).toHaveValue('byetools-consumer');
+  await expect(page.locator('#mq-port')).toHaveValue('9092');
+  await brokerPicker.locator('[data-bt-select-toggle]').click();
+  await brokerPicker.locator('[data-bt-select-value="rabbitmq"]').click();
+  await expect(page.locator('#mq-exchange')).toHaveValue('byetools.exchange');
+  await expect(page.locator('#mq-queue')).toHaveValue('byetools.queue');
+  await expect(page.locator('#mq-port')).toHaveValue('5672');
+  await brokerPicker.locator('[data-bt-select-toggle]').click();
+  await brokerPicker.locator('[data-bt-select-value="rocketmq"]').click();
+  await expect(page.locator('#mq-topic')).toHaveValue('ByeToolsTopic');
+  await expect(page.locator('#mq-tag')).toHaveValue('*');
+  await expect(page.locator('#mq-group')).toHaveValue('byetools-consumer');
+  await expect(page.locator('#mq-port')).toHaveValue('8081');
+  await expect(page.locator('#mq-address-label')).toHaveText('Proxy Endpoint');
+  await expect(page.locator('#mq-username-label')).toHaveText('AccessKey');
+  await expect(page.locator('#mq-password-label')).toHaveText('SecretKey');
+  await page.locator('#mq-config-name').fill('RocketMQ 测试');
+  await page.locator('#mq-address').fill('rocketmq.example.test');
+  await page.locator('#mq-tag').fill('TagA || TagB');
+  await page.locator('[data-mq-action="save-config"]').click();
+  await expect(page.locator('.mq-config-item')).toContainText('RocketMQ 测试');
+  await page.locator('#mq-tag').fill('*');
+  await page.locator('.mq-config-item [data-mq-config-action="apply"]').click();
+  await expect(page.locator('#mq-tag')).toHaveValue('TagA || TagB');
+  await page.locator('.mq-config-item [data-mq-config-action="delete"]').click();
+  await expect(page.locator('.mq-config-empty')).toBeVisible();
+  await brokerPicker.locator('[data-bt-select-toggle]').click();
+  await brokerPicker.locator('[data-bt-select-value="kafka"]').click();
+  await expect(page.locator('#mq-port')).toHaveValue('9092');
+  await page.locator('[data-mq-format="json"]').click();
+  await page.locator('#mq-config-name').fill('Kafka 测试');
+  await page.locator('#mq-address').fill('mq.example.test');
+  await page.locator('[data-mq-action="save-config"]').click();
+  await expect(page.locator('#mq-config-list')).toBeVisible();
+  await expect(page.locator('.mq-config-item')).toContainText('Kafka 测试');
+  await page.locator('#mq-address').fill('changed.example.test');
+  await page.locator('.mq-config-item [data-mq-config-action="apply"]').click();
+  await expect(page.locator('#mq-address')).toHaveValue('mq.example.test');
+  await page.locator('.mq-config-item [data-mq-config-action="delete"]').click();
+  await expect(page.locator('.mq-config-empty')).toBeVisible();
+  await page.locator('#mq-message').fill('{"event":"publish","value":1}');
+  await page.locator('[data-mq-action="format"]').click();
+  await expect(page.locator('#mq-message')).toHaveValue(/\n  "event": "publish"/);
+  await page.locator('[data-mq-action="send"]').click();
+  await expect(page.locator('#mq-connection-status')).toContainText('桌面端');
+  await expect(page.locator('.mq-log-row')).toHaveCount(1);
+  await page.locator('[data-mq-action="consume-start"]').click();
+  await expect(page.locator('[data-mq-action="consume-stop"]')).toBeEnabled();
+  await expect(page.locator('#mq-connection-status')).toContainText('消费待桌面端接入');
+  if (!isMobile) {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const toolbarTop = await page.locator('.mq-toolbar').evaluate((element) => Math.round(element.getBoundingClientRect().top));
+    expect(toolbarTop).toBeGreaterThanOrEqual(90);
+    expect(toolbarTop).toBeLessThanOrEqual(120);
+    await expect(page.locator('.mq-toolbar-actions')).toBeInViewport();
+  }
+  const excelDownload = page.waitForEvent('download');
+  await page.locator('[data-mq-action="export-consumed"]').click();
+  expect((await excelDownload).suggestedFilename()).toBe('byetools-consumed-messages.xls');
+});
+
+test('Linux 命令速查支持分类、搜索、详情、复制和相关命令跳转', async ({ page, isMobile }) => {
+  await page.goto('/#/tool/linux-commands');
+  await expect(page.getByRole('heading', { name: 'Linux 命令速查' })).toBeVisible();
+  await expect(page.locator('#linux-command-categories .linux-command-category')).toHaveCount(12);
+  await expect(page.locator('#linux-command-list .linux-command-item')).not.toHaveCount(0);
+  await expect(page.locator('#linux-command-detail')).toContainText('列出目录内容');
+  await expect(page.locator('.linux-command-syntax')).toContainText('ls');
+
+  await page.locator('#linux-command-search').fill('端口');
+  await expect(page.locator('#linux-command-result-title')).toContainText('端口');
+  await expect(page.locator('#linux-command-list')).toContainText('ss');
+  await page.locator('.linux-command-item[data-linux-command="ss"]').click();
+  await expect(page.locator('#linux-command-detail')).toContainText('查看套接字和端口状态');
+  await expect(page.locator('.linux-command-detail')).toContainText('常用参数');
+  await expect(page.locator('.linux-command-detail')).toContainText('使用示例');
+
+  await page.locator('#linux-command-search').fill('grep');
+  await expect(page.locator('.linux-command-item[data-linux-command="grep"]')).toBeVisible();
+  await page.locator('.linux-command-item[data-linux-command="grep"]').click();
+  await expect(page.locator('#linux-command-detail')).toContainText('按模式搜索文本');
+  const clipboardText = await page.locator('[data-linux-copy]').first().getAttribute('data-linux-copy');
+  expect(clipboardText).toBeTruthy();
+  await page.locator('[data-linux-copy]').first().click();
+  await expect(page.locator('#toast')).toContainText('命令已复制');
+
+  await page.locator('#linux-command-search').fill('');
+  await page.locator('[data-linux-category="filesystem"]').click();
+  await expect(page.locator('#linux-command-result-title')).toHaveText('文件与目录');
+  await page.locator('.linux-command-item[data-linux-command="rm"]').click();
+  await expect(page.locator('.linux-command-risk-note.is-danger')).toContainText('危险操作');
+  await expect(page.locator('.linux-command-risk-badge.is-danger')).toContainText('高风险');
+  await page.locator('[data-linux-related="find"]').click();
+  await expect(page.locator('#linux-command-detail h2')).toHaveText('find');
+
+  await page.locator('#linux-command-search').fill('不存在的命令');
+  await expect(page.locator('.linux-command-empty')).toBeVisible();
+  await page.locator('[data-linux-action="clear-search"]').click();
+  await expect(page.locator('.linux-command-item')).not.toHaveCount(0);
+
+  if (!isMobile) {
+    const columns = await page.locator('.linux-command-layout').evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+    expect(columns).toBe(3);
+  }
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
@@ -202,6 +400,34 @@ test('JSON 工作台支持格式化和视图切换', async ({ page }) => {
   await expect(page.locator('.json-metadata-grid')).toBeVisible();
 });
 
+test('格式化工具支持 XML 格式化、转换和 SQL 整理', async ({ page }) => {
+  await page.goto('/#/tool/xml-format');
+  await expect(page.getByRole('heading', { name: 'XML 格式化' })).toBeVisible();
+  await page.getByRole('button', { name: '格式化', exact: true }).click();
+  await expect(page.locator('#xml-format-output')).toContainText('<catalog>');
+  await expect(page.locator('#xml-format-output')).toContainText('\n  <book');
+  await page.getByRole('button', { name: '压缩', exact: true }).click();
+  await expect(page.locator('#xml-format-output')).toHaveText(/^[^\n]+$/);
+
+  await page.goto('/#/tool/xml-converter');
+  await expect(page.getByRole('heading', { name: 'XML 转换器' })).toBeVisible();
+  await page.getByRole('button', { name: '转换', exact: true }).click();
+  await expect(page.locator('#xml-converter-output')).toContainText('"@id": "42"');
+  await expect(page.locator('#xml-converter-output')).toContainText('"roles": [');
+  await page.locator('#xml-converter-format').selectOption('yaml');
+  await expect(page.locator('#xml-converter-output')).toContainText('roles:');
+
+  await page.goto('/#/tool/sql-format');
+  await expect(page.getByRole('heading', { name: 'SQL 格式化' })).toBeVisible();
+  await page.getByRole('button', { name: '格式化', exact: true }).click();
+  const sqlOutput = page.locator('#sql-format-output');
+  await expect(sqlOutput).toContainText('SELECT');
+  await expect(sqlOutput).toContainText('FROM');
+  await expect(sqlOutput).toContainText('WHERE');
+  await page.getByRole('button', { name: '压缩', exact: true }).click();
+  await expect(sqlOutput).not.toBeEmpty();
+});
+
 test('主题和收藏状态写入 IndexedDB', async ({ page }) => {
   await page.goto('/');
   await page.locator('.topbar [data-action="settings"]').click();
@@ -228,7 +454,7 @@ test('所有工具均可打开且不会产生页面异常', async ({ page }) => 
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.goto('/');
   const toolIds = await page.locator('.tool-card').evaluateAll((cards) => cards.map((card) => card.dataset.toolId));
-  expect(toolIds).toHaveLength(50);
+  expect(toolIds).toHaveLength(57);
   for (const toolId of toolIds) {
     await test.step(`打开 ${toolId}`, async () => {
       await page.locator(`.tool-card[data-tool-id="${toolId}"]`).evaluate((card) => card.click());
@@ -376,6 +602,62 @@ test('SM4 密钥和 IV 默认 UTF-8 并支持编码切换与随机生成', async
   await page.locator('#crypto-input').fill(encrypted);
   await page.locator('[data-crypto-operation="decrypt"]').click();
   await expect(page.locator('#crypto-output')).toHaveText('ByeTools');
+});
+
+test('RSA 工具支持生成密钥对并完成两种方案加解密', async ({ page }) => {
+  await page.goto('/#/tool/rsa');
+  await expect(page.getByRole('heading', { name: 'RSA 加密解密' })).toBeVisible();
+  await expect(page.locator('#crypto-mode')).toHaveValue('RSA-OAEP');
+  await expect(page.locator('#crypto-rsa-hash')).toHaveValue('SHA-256');
+
+  const roundTrip = async (text) => {
+    await page.locator('#crypto-input').fill(text);
+    await page.locator('[data-crypto-operation="encrypt"]').click();
+    await expect(page.locator('#crypto-output')).toHaveText(/^[A-Za-z0-9+/=]+$/);
+    const outputLayout = await page.locator('#crypto-output').evaluate((node) => ({ overflowWrap: getComputedStyle(node).overflowWrap, scrollWidth: node.scrollWidth, clientWidth: node.clientWidth }));
+    expect(outputLayout.overflowWrap).toBe('anywhere');
+    expect(outputLayout.scrollWidth).toBeLessThanOrEqual(outputLayout.clientWidth + 1);
+    const encrypted = await page.locator('#crypto-output').textContent();
+    expect(encrypted).toMatch(/^[A-Za-z0-9+/=]+$/);
+    await page.locator('#crypto-input').fill(encrypted);
+    await page.locator('[data-crypto-operation="decrypt"]').click();
+    await expect(page.locator('#crypto-output')).toHaveText(text);
+  };
+
+  await page.locator('[data-rsa-key-action="generate"]').click();
+  await expect(page.locator('#crypto-rsa-public-key')).toHaveValue(/-----BEGIN PUBLIC KEY-----/);
+  await expect(page.locator('#crypto-rsa-private-key')).toHaveValue(/-----BEGIN PRIVATE KEY-----/);
+  await roundTrip('ByeTools RSA-OAEP');
+
+  await page.locator('#crypto-mode').selectOption('RSAES-PKCS1-v1_5');
+  await page.locator('[data-rsa-key-action="generate"]').click();
+  await expect(page.locator('#crypto-rsa-public-key')).toHaveValue(/-----BEGIN PUBLIC KEY-----/);
+  await roundTrip('ByeTools RSAES');
+});
+
+test('3DES 工具支持 CBC、ECB 加解密和原文密钥', async ({ page }) => {
+  await page.goto('/#/tool/3des');
+  await expect(page.getByRole('heading', { name: '3DES 加密解密' })).toBeVisible();
+  await expect(page.locator('#crypto-mode')).toHaveValue('CBC');
+  await page.locator('#crypto-key').fill('123456789012345678901234');
+  await page.locator('#crypto-iv').fill('12345678');
+  await page.locator('#crypto-input').fill('ByeTools 3DES');
+  await page.locator('[data-crypto-operation="encrypt"]').click();
+  const cbcEncrypted = await page.locator('#crypto-output').textContent();
+  expect(cbcEncrypted).toMatch(/^[A-Za-z0-9+/=]+$/);
+  await page.locator('#crypto-input').fill(cbcEncrypted);
+  await page.locator('[data-crypto-operation="decrypt"]').click();
+  await expect(page.locator('#crypto-output')).toHaveText('ByeTools 3DES');
+
+  await page.locator('#crypto-mode').selectOption('ECB');
+  await expect(page.locator('#crypto-iv')).toBeDisabled();
+  await page.locator('#crypto-input').fill('ByeTools 3DES ECB');
+  await page.locator('[data-crypto-operation="encrypt"]').click();
+  const ecbEncrypted = await page.locator('#crypto-output').textContent();
+  expect(ecbEncrypted).toMatch(/^[A-Za-z0-9+/=]+$/);
+  await page.locator('#crypto-input').fill(ecbEncrypted);
+  await page.locator('[data-crypto-operation="decrypt"]').click();
+  await expect(page.locator('#crypto-output')).toHaveText('ByeTools 3DES ECB');
 });
 
 test('加密算法选择器显示图标和说明并支持切换', async ({ page }) => {

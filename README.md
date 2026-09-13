@@ -1,6 +1,6 @@
 # ByeTools
 
-ByeTools 是一个免登录、本地优先的开发者工具箱。当前版本按产品原型提供 50 个工具入口，并实现主题、搜索、分类、收藏、历史、IndexedDB 持久化、离线缓存和响应式工作台。
+ByeTools 是一个免登录、本地优先的开发者工具箱。
 ## 演示效果
 ![浅色](assert/%E6%B5%85%E8%89%B2.png)
 ![深色](assert/%E6%B7%B1%E8%89%B2.png)
@@ -14,25 +14,11 @@ npm run dev
 
 开发地址为 `http://127.0.0.1:4173/`。
 
-## 文件工具
-
-文件工具分类包含图片工具、Favicon 生成器和 PDF 工具。图片工具在同一个工作台内切换压缩、尺寸调整、可视化裁剪、格式转换和 Base64 互转；裁剪模式支持拖动裁剪框、八方向缩放、方向键微调、自由/原始/常用比例、自定义比例、旋转、翻转、矩形与多种形状，以及导出尺寸设置。Favicon 支持多尺寸 PNG、`favicon.ico` 和 HTML 引用片段生成。PDF 工具在同一个工作台内切换合并、拆分、水印、页面整理和转图片，文件均在本地处理。
-
-## 编码转换工具
-
-编码转换分类新增二维码与条形码工作台，在同一个工作台内切换二维码生成、二维码识别、条形码生成和条形码识别。二维码支持纠错等级、边距、尺寸和颜色设置；条形码支持 Code 128、Code 39、EAN、UPC、ITF-14、Codabar 等格式。图片识别使用本地 ZXing 解析，生成和识别均不会上传文件。
-
-## Markdown 编辑器
-
-Markdown 编辑器支持编辑、源码、分栏和预览四种视图，可在同一份内容上切换所见即所得编辑、源码编辑、源码与预览并排以及纯预览。工具栏包含标题级别、粗体、斜体、删除线、行内代码、无序列表、有序列表、任务列表、引用、链接、图片、表格、代码块、公式和分隔线。点击“打开文件”可以读取当前设备上的 `.md`、`.markdown` 或 `.txt` 文件继续编辑；文件名会自动带上 Markdown 扩展名。点击“保存”或使用 `Ctrl+S` / `⌘S` 会将当前内容下载为 Markdown 文件，编辑草稿会同步保存在本地存储中。
-
-## 思维导图生成
-
-思维导图工具使用 Markdown 标题和列表描述节点层级，输入变化后会实时生成可缩放、可拖动的 SVG 思维导图。内置基础示例、读书笔记、技术架构、产品规划、学习路线、会议纪要和 OKR 拆解七种模板，支持复制大纲、插入链接、清空、自适应视图以及 SVG、PNG 下载；透明底选项可用于导出无背景图形。所有解析和导出均在当前设备完成。
-
 如果需要根据 `package.json` 更新依赖，可以使用 `npm install`。首次运行 Playwright 且本机没有浏览器组件时，可执行 `npx playwright install`。
 
 项目的详细构建、启动、测试和打包说明见：[项目构建启动打包说明.md](./项目构建启动打包说明.md)。
+
+完整工具清单、功能说明、扩展能力和验收要求见：[ByeTools-最终详细方案.md](../方案/ByeTools-最终详细方案.md)。
 
 ## 验证
 
@@ -50,11 +36,9 @@ npm run tauri:dev
 npm run tauri:build
 ```
 
-Windows 构建 SQLCipher 的 vendored OpenSSL 需要 Perl、Visual Studio C++ Build Tools 和 WebView2。构建产物位于 `src-tauri/target/release/bundle/`。桌面版启动失败时会拒绝回退到明文 SQLite，并返回结构化错误码。
+Windows 构建 SQLCipher 的 vendored OpenSSL 以及 Kafka 的 librdkafka 需要 Perl、CMake、Visual Studio C++ Build Tools 和 WebView2。构建产物位于 `src-tauri/target/release/bundle/`。桌面版启动失败时会拒绝回退到明文 SQLite，并返回结构化错误码。
 
 桌面端加密配置命令固定为 `crypto_config_list`、`crypto_config_save`、`crypto_config_apply`、`crypto_config_update`、`crypto_config_delete`、`crypto_config_migrate` 和 `crypto_config_rotate_key`。配置列表只返回掩码摘要，完整正文仅在应用或编辑操作中按需解密。
-
-SHA-3 已通过 `js-sha3` 在本地执行，支持 SHA3-256、SHA3-384 和 SHA3-512。SM2、SM3、SM4 已通过 `sm-crypto` 在本地执行：SM2 支持 Hex 公钥/私钥生成、私钥推导公钥、C1C3C2/C1C2C3 加解密、04 前缀和 ASN.1 DER 兼容选项，SM3 支持摘要输出，SM4 支持 ECB/CBC 及 PKCS#7、NoPadding。SM4 的 CTR、CFB、OFB 仍会明确显示暂不支持，不会生成伪造结果。AES、SHA-2 及其他纯浏览器工具同样在本地执行，工具输入不会上传服务器。
 
 ## 项目结构
 

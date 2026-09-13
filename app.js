@@ -6,13 +6,19 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import QRCode from 'qrcode';
 import bwipjs from 'bwip-js/browser';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import CryptoJS from 'crypto-js';
+import JSEncrypt from 'jsencrypt';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const { sm2: sm2Library, sm3: sm3Library, sm4: sm4Library } = smCrypto;
 
 const tools = [
-  { id: 'json', name: 'JSON 格式化', description: '格式化、验证和美化 JSON 数据', category: 'data-format', label: 'JSON 工具', icon: '{ }', iconClass: 'icon-json', environment: 'local', featured: true, keywords: 'json 格式化 校验 美化 树 编辑 lint 解码' },
+  { id: 'json', name: 'JSON 格式化', description: '格式化、验证和美化 JSON 数据', category: 'format', label: '格式化工具', icon: '{ }', iconClass: 'icon-json', environment: 'local', featured: true, keywords: 'json 格式化 校验 美化 树 编辑 lint 解码' },
+  { id: 'json-to-types', name: 'JSON 转类型生成器', description: '从 JSON 样本生成二十多种语言的类型定义', category: 'format', label: '格式化工具', icon: 'J→T', iconClass: 'icon-json-types', environment: 'local', capability: 'ready', capabilityLabel: '本地生成', keywords: 'json types 类型 生成 typescript java go rust swift kotlin python csharp interface struct quicktype' },
+  { id: 'xml-format', name: 'XML 格式化', description: '格式化、压缩和校验 XML 文档', category: 'format', label: '格式化工具', icon: 'XML', iconClass: 'icon-xml-format', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: 'xml 格式化 压缩 美化 校验 pretty print' },
+  { id: 'xml-converter', name: 'XML 转换器', description: '将 XML 转换为 JSON、YAML、TOML 等代码格式', category: 'format', label: '格式化工具', icon: 'X→', iconClass: 'icon-xml-converter', environment: 'local', capability: 'ready', capabilityLabel: '本地转换', keywords: 'xml 转换 json yaml toml javascript js php 数组 属性 命名空间' },
+  { id: 'sql-format', name: 'SQL 格式化', description: '格式化、压缩和整理 SQL 查询语句', category: 'format', label: '格式化工具', icon: 'SQL', iconClass: 'icon-sql-format', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: 'sql 格式化 压缩 mysql postgresql sqlite sqlserver 查询 database' },
   { id: 'base64', name: 'Base64 编解码', description: 'Base64 编码与解码', category: 'encoding', label: '编码转换', icon: '64', iconClass: 'icon-base64', environment: 'local', featured: true, keywords: 'base64 编码 解码' },
   { id: 'qr-barcode', name: '二维码与条形码', description: '二维码和条形码的生成与图片识别', category: 'encoding', label: '编码转换', icon: 'QR', iconClass: 'icon-qr-barcode', environment: 'local', capability: 'ready', capabilityLabel: '本地处理', keywords: '二维码 qr code 生成 识别 条形码 barcode 生成器 识别器' },
   { id: 'time', name: '时间戳转换', description: '时间戳、日期时间和时长单位互转', category: 'helper', label: '开发辅助', icon: '◷', iconClass: 'icon-time', environment: 'local', featured: true, keywords: '时间戳 日期 时间 时区 秒 毫秒 分 时 天 周 月 年' },
@@ -25,10 +31,13 @@ const tools = [
   { id: 'sm4', name: 'SM4 加密解密', description: '国密 SM4 对称加密与解密参数', category: 'crypto', label: '加密解密', icon: 'S4', iconClass: 'icon-sm4', environment: 'local', cryptoType: 'symmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'sm4 国密 对称 加密 解密' },
   { id: 'aes', name: 'AES 加密解密', description: 'AES-GCM、AES-CBC、AES-CTR 加密与解密', category: 'crypto', label: '加密解密', icon: 'AES', iconClass: 'icon-aes', environment: 'local', cryptoType: 'symmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'aes aes-gcm aes-cbc aes-ctr 对称 加密 解密' },
   { id: 'des', name: 'DES 加密解密', description: 'DES 对称加密与解密参数（不推荐）', category: 'crypto', label: '加密解密', icon: 'DES', iconClass: 'icon-des', environment: 'local', cryptoType: 'symmetric', capability: 'deprecated', capabilityLabel: '不推荐', keywords: 'des 对称 加密 解密 弱算法 已淘汰' },
-  { id: '3des', name: '3DES 加密解密', description: 'Triple DES 对称加密与解密参数（不推荐）', category: 'crypto', label: '加密解密', icon: '3D', iconClass: 'icon-3des', environment: 'local', cryptoType: 'symmetric', capability: 'deprecated', capabilityLabel: '不推荐', keywords: '3des triple des desede 对称 加密 解密 弱算法 已淘汰' },
+  { id: '3des', name: '3DES 加密解密', description: 'Triple DES-CBC、ECB 加解密（仅兼容旧系统）', category: 'crypto', label: '加密解密', icon: '3D', iconClass: 'icon-3des', environment: 'local', cryptoType: 'symmetric', capability: 'ready', capabilityLabel: '兼容性支持', keywords: '3des triple des desede tdea 对称 加密 解密 兼容 旧系统' },
+  { id: 'rsa', name: 'RSA 加密解密', description: 'RSA-OAEP、PKCS#1 v1.5 非对称加解密', category: 'crypto', label: '加密解密', icon: 'RSA', iconClass: 'icon-rsa', environment: 'local', cryptoType: 'asymmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'rsa rsa-oaep pkcs1 pkcs#1 公钥 私钥 非对称 加密 解密 密钥对' },
   { id: 'unicode', name: 'Unicode 编解码', description: 'Unicode 编码与解码', category: 'encoding', label: '编码转换', icon: 'U', iconClass: 'icon-unicode', environment: 'local', keywords: 'unicode 编码 解码' },
   { id: 'ip', name: 'IP 查询', description: 'IP 地址归属地查询', category: 'network', label: '网络工具', icon: '•', iconClass: 'icon-ip', environment: 'desktop', keywords: 'ip 地址 网络 查询' },
-  { id: 'html', name: 'HTML 转换', description: 'HTML 实体编码与解码', category: 'format', label: '格式化工具', icon: '</>', iconClass: 'icon-html', environment: 'local', keywords: 'html 实体 编码 解码' },
+  { id: 'message-queue', name: '消息中间件', description: 'MQTT、Kafka、RabbitMQ、RocketMQ 消息发送与消费', category: 'message-queue', label: '消息队列', icon: 'MQ', iconClass: 'icon-message-queue', environment: 'desktop', keywords: 'mq mqtt kafka rabbitmq rocketmq 消息队列 消息中间件 发布 订阅 生产 消费 topic queue exchange tag nameserver' },
+  { id: 'linux-commands', name: 'Linux 命令速查', description: '按分类查询命令解释、参数和实用示例', category: 'cheatsheet', label: '速查工具', icon: '>_', iconClass: 'icon-linux-command', environment: 'local', capability: 'ready', capabilityLabel: '本地查询', keywords: 'linux shell 命令 速查 手册 运维 参数 示例 文件 网络 进程 权限' },
+  { id: 'html', name: 'HTML 转换', description: 'HTML 实体编码与解码', category: 'encoding', label: '编码转换', icon: '</>', iconClass: 'icon-html', environment: 'local', keywords: 'html 实体 编码 解码' },
   { id: 'regex', name: '正则表达式测试', description: '正则表达式在线测试', category: 'text', label: '文本工具', icon: '✣', iconClass: 'icon-regex', environment: 'local', keywords: 'regex 正则 匹配 测试' },
   { id: 'random', name: '随机数生成', description: '数字、UUID、颜色和令牌等多类型生成，支持 CSV 导出', category: 'generator', label: '生成器', icon: '⌁', iconClass: 'icon-random', environment: 'local', keywords: '随机数 uuid 随机字符串 整数 小数 布尔 hex base64 日期 颜色 ip csv 导出' },
   { id: 'password', name: '密码生成器', description: '批量生成安全随机密码，支持复制和 CSV 导出', category: 'generator', label: '生成器', icon: '•••', iconClass: 'icon-password', environment: 'local', capability: 'ready', capabilityLabel: '本地生成', keywords: '密码 password 口令 随机 安全 强度 批量 csv 导出' },
@@ -77,6 +86,9 @@ const state = {
   currentTool: null,
   favorites: new Set(),
   history: [],
+  messageQueue: {
+    configs: [],
+  },
   json: {
     draft: defaultJson,
     value: null,
@@ -102,16 +114,18 @@ async function hydratePersistedState() {
   if (!storage) return;
   try {
     await storage.ready;
-    const [favorites, recentTools, themeMode, menuLayout, density, jsonDraft] = await Promise.all([
+    const [favorites, recentTools, themeMode, menuLayout, density, jsonDraft, messageQueueConfigs] = await Promise.all([
       storage.getFavorites(),
       storage.getRecentTools(),
       storage.getSetting('theme-mode', 'dark'),
       storage.getSetting('menu-layout', 'standard'),
       storage.getSetting('density', 'comfortable'),
       storage.getDraft('json'),
+      storage.getSetting('mq-configs', []),
     ]);
     state.favorites = new Set(Array.isArray(favorites) ? favorites : []);
-    state.history = Array.isArray(recentTools) ? recentTools : [];
+    state.history = Array.isArray(recentTools) ? recentTools.filter((id) => tools.some((tool) => tool.id === id)) : [];
+    state.messageQueue.configs = Array.isArray(messageQueueConfigs) ? messageQueueConfigs.filter((item) => item && typeof item === 'object' && item.id && item.name) : [];
     const draftPayload = jsonDraft?.payload && typeof jsonDraft.payload === 'object' ? jsonDraft.payload : {};
     if (typeof draftPayload.draft === 'string' && draftPayload.draft) state.json.draft = draftPayload.draft;
     if (Array.isArray(draftPayload.expanded)) state.json.expanded = new Set(draftPayload.expanded);
@@ -138,7 +152,7 @@ const CONFIG_SECRET_KEY = 'byetools-crypto-config-secret-v1';
 const CONFIG_CRYPTO_VERSION = 1;
 let pendingCryptoConfigEditId = '';
 const configTextFieldIds = new Set([
-  'crypto-key', 'crypto-private-key', 'crypto-iv', 'regex-pattern', 'color-input', 'palette-base',
+  'crypto-key', 'crypto-private-key', 'crypto-rsa-public-key', 'crypto-rsa-private-key', 'crypto-iv', 'regex-pattern', 'color-input', 'palette-base',
   'password-custom-symbols', 'string-custom-symbols', 'replace-search',
   'replace-with', 'line-filter-regex', 'cron-expression',
 ]);
@@ -161,6 +175,48 @@ const refs = {
   paletteResults: document.querySelector('#palette-results'),
   toast: document.querySelector('#toast'),
 };
+
+const regexPresets = [
+  { id: 'email', label: '邮箱地址', pattern: '^[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}$', description: '匹配常见邮箱格式' },
+  { id: 'url', label: '网址 URL', pattern: 'https?://[^\\s]+', description: '匹配 HTTP 或 HTTPS 地址' },
+  { id: 'phone', label: '中国手机号', pattern: '^1[3-9]\\d{9}$', description: '匹配 11 位手机号码' },
+  { id: 'ipv4', label: 'IPv4 地址', pattern: '^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$', description: '匹配标准 IPv4 地址' },
+  { id: 'date', label: '日期格式', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: '匹配 YYYY-MM-DD 日期' },
+  { id: 'digits', label: '纯数字', pattern: '^\\d+$', description: '只允许输入数字' },
+  { id: 'integer', label: '整数', pattern: '^-?\\d+$', description: '匹配正负整数' },
+  { id: 'chinese', label: '中文字符', pattern: '[\\u4e00-\\u9fa5]+', description: '匹配连续中文字符' },
+  { id: 'whitespace', label: '连续空白', pattern: '\\s+', description: '匹配空格、制表符或换行' },
+  { id: 'username', label: '用户名', pattern: '^[a-zA-Z][a-zA-Z0-9_]{2,15}$', description: '字母开头的 3-16 位用户名' },
+];
+
+const regexSyntax = [
+  { token: '.', label: '任意字符', description: '匹配除换行外的任意单个字符' },
+  { token: '\\d', label: '数字', description: '匹配一个数字字符' },
+  { token: '\\w', label: '单词字符', description: '匹配字母、数字或下划线' },
+  { token: '\\s', label: '空白字符', description: '匹配空格、制表符或换行' },
+  { token: '^', label: '开头', description: '匹配字符串或行的开始位置' },
+  { token: '$', label: '结尾', description: '匹配字符串或行的结束位置' },
+  { token: '*', label: '零次或多次', description: '前一个表达式可重复零次以上' },
+  { token: '+', label: '一次或多次', description: '前一个表达式至少出现一次' },
+  { token: '?', label: '零次或一次', description: '前一个表达式最多出现一次' },
+  { token: '{n,m}', label: '重复次数', description: '限定前一个表达式重复 n 到 m 次' },
+  { token: '[abc]', label: '字符集合', description: '匹配集合中的任意一个字符' },
+  { token: '[^abc]', label: '排除集合', description: '匹配不在集合中的任意字符' },
+  { token: '(abc)', label: '捕获分组', description: '将多个表达式组合并捕获结果' },
+  { token: '(?:abc)', label: '非捕获分组', description: '组合表达式但不保存捕获结果' },
+  { token: 'a|b', label: '或条件', description: '匹配 a 或 b 其中任意一个' },
+];
+
+const regexHelperMarkup = () => `<section class="regex-helper-panel" aria-label="正则表达式辅助信息">
+  <details class="regex-helper-section">
+    <summary class="regex-helper-head"><div><strong>常用正则表达式</strong><small>点击模板即可填入上方输入框</small></div><span class="code-badge">PRESETS</span></summary>
+    <div class="regex-preset-grid">${regexPresets.map((preset) => `<button class="regex-preset" type="button" data-regex-preset="${preset.id}" aria-pressed="false"><span>${escapeHtml(preset.label)}</span><small>${escapeHtml(preset.description)}</small></button>`).join('')}</div>
+  </details>
+  <details class="regex-helper-section">
+    <summary class="regex-helper-head"><div><strong>核心语法速查</strong><small>JavaScript 正则表达式语法</small></div><span class="code-badge">SYNTAX</span></summary>
+    <div class="regex-syntax-grid">${regexSyntax.map((item) => `<div class="regex-syntax-item"><code>${escapeHtml(item.token)}</code><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description)}</small></div></div>`).join('')}</div>
+  </details>
+</section>`;
 
 const workspaceTemplates = {
   json: () => `<div class="json-workbench" id="json-workbench">
@@ -209,6 +265,7 @@ const workspaceTemplates = {
       </section>
     </div>
   </div>`,
+  'json-to-types': jsonTypesWorkbenchMarkup,
   base64: () => `<div class="workspace-toolbar"><button class="primary-button" data-tool-action="base64-encode">编码</button><button class="secondary-button" data-tool-action="base64-decode">解码</button><button class="secondary-button" data-tool-action="copy-output">复制结果</button></div><div class="tool-panel"><div class="workspace-card"><div class="workspace-card-head"><span>输入</span><span>UTF-8</span></div><textarea id="tool-input" spellcheck="false" placeholder="输入要编码或解码的文本…">ByeTools 本地优先</textarea></div><div class="workspace-card"><div class="workspace-card-head"><span>输出</span><span id="tool-status">等待处理</span></div><pre id="tool-output" aria-live="polite"></pre></div></div>`,
   url: () => `<div class="workspace-toolbar"><button class="primary-button" data-tool-action="url-encode">编码</button><button class="secondary-button" data-tool-action="url-decode">解码</button><button class="secondary-button" data-tool-action="copy-output">复制结果</button></div><div class="tool-panel"><div class="workspace-card"><div class="workspace-card-head"><span>输入</span><span>URL Component</span></div><textarea id="tool-input" spellcheck="false" placeholder="输入 URL 或文本…">https://byetools.local/search?q=开发工具</textarea></div><div class="workspace-card"><div class="workspace-card-head"><span>输出</span><span id="tool-status">等待处理</span></div><pre id="tool-output" aria-live="polite"></pre></div></div>`,
   unicode: () => `<div class="workspace-toolbar"><button class="primary-button" data-tool-action="unicode-encode">Unicode 编码</button><button class="secondary-button" data-tool-action="unicode-decode">Unicode 解码</button><button class="secondary-button" data-tool-action="copy-output">复制结果</button></div><div class="tool-panel"><div class="workspace-card"><div class="workspace-card-head"><span>输入内容</span><span>UTF-8 / \\uXXXX</span></div><textarea id="tool-input" spellcheck="false" placeholder="输入文本或 Unicode 转义序列…">ByeTools 开发者工具箱</textarea></div><div class="workspace-card"><div class="workspace-card-head"><span>转换结果</span><span id="tool-status">等待处理</span></div><pre id="tool-output" aria-live="polite"></pre></div></div>`,
@@ -229,7 +286,7 @@ const workspaceTemplates = {
   'text-cleaner': textCleanerWorkbenchMarkup,
   'line-tools': lineToolsWorkbenchMarkup,
   invisible: invisibleWorkbenchMarkup,
-  regex: () => `<div class="tool-panel"><div class="workspace-card"><div class="workspace-card-head"><span>正则表达式</span><span>实时匹配</span></div><textarea id="regex-pattern" style="min-height:110px" spellcheck="false" placeholder="输入正则表达式…">(ByeTools)</textarea><div class="workspace-card-head"><span>测试文本</span></div><textarea id="tool-input" spellcheck="false" placeholder="输入测试文本…">欢迎使用 ByeTools 开发者工具箱</textarea></div><div class="workspace-card"><div class="workspace-card-head"><span>匹配结果</span><span id="tool-status">实时计算</span></div><pre id="tool-output"></pre></div></div>`,
+  regex: () => `<div class="tool-panel regex-tool-panel"><section class="workspace-card regex-input-card"><div class="workspace-card-head"><div><strong>正则表达式</strong><small>输入表达式后实时匹配</small></div><span class="code-badge">REGEX</span></div><textarea class="regex-pattern-input" id="regex-pattern" spellcheck="false" placeholder="输入正则表达式…">(ByeTools)</textarea><div class="workspace-card-head"><div><strong>测试文本</strong><small>输入待匹配的文本内容</small></div><span>UTF-8</span></div><textarea class="regex-test-input" id="tool-input" spellcheck="false" placeholder="输入测试文本…">欢迎使用 ByeTools 开发者工具箱</textarea>${regexHelperMarkup()}</section><section class="workspace-card regex-result-card"><div class="workspace-card-head"><div><strong>匹配结果</strong><small>根据输入实时更新</small></div><span id="tool-status">实时计算</span></div><pre id="tool-output" aria-live="polite"></pre></section></div>`,
   hash: () => `<div class="workspace-form"><label>输入文本<textarea id="tool-input" style="min-height:180px" spellcheck="false" placeholder="输入要计算 Hash 的文本…">ByeTools</textarea></label><div class="workspace-toolbar"><button class="primary-button" data-tool-action="hash">计算 Hash</button><button class="secondary-button" data-tool-action="copy-output">复制结果</button></div><div class="workspace-result" id="hash-result"></div></div>`,
   random: randomWorkbenchMarkup,
   password: passwordWorkbenchMarkup,
@@ -241,6 +298,9 @@ const workspaceTemplates = {
   curl: curlWorkbenchMarkup,
   html: htmlWorkbenchMarkup,
   mermaid: mermaidWorkbenchMarkup,
+  'xml-format': xmlFormatWorkbenchMarkup,
+  'xml-converter': xmlConverterWorkbenchMarkup,
+  'sql-format': sqlFormatWorkbenchMarkup,
   'markdown-image': markdownImageWorkbenchMarkup,
   'markdown-editor': markdownEditorWorkbenchMarkup,
   mindmap: mindmapWorkbenchMarkup,
@@ -248,6 +308,8 @@ const workspaceTemplates = {
   'qr-barcode': qrBarcodeWorkbenchMarkup,
   favicon: faviconWorkbenchMarkup,
   'pdf-tools': pdfToolsWorkbenchMarkup,
+  'message-queue': messageQueueWorkbenchMarkup,
+  'linux-commands': linuxCommandWorkbenchMarkup,
   diff: diffWorkbenchMarkup,
   cron: cronWorkbenchMarkup,
   md5: (tool) => cryptoWorkbenchMarkup(tool),
@@ -259,8 +321,467 @@ const workspaceTemplates = {
   aes: (tool) => cryptoWorkbenchMarkup(tool),
   des: (tool) => cryptoWorkbenchMarkup(tool),
   '3des': (tool) => cryptoWorkbenchMarkup(tool),
+  rsa: (tool) => cryptoWorkbenchMarkup(tool),
   default: (tool) => `<div class="workspace-notice">${tool.name} 当前仅提供能力入口，所需运行能力尚未接入。</div>`,
 };
+
+const jsonTypeLanguages = [
+  { value: 'java', label: 'Java', icon: 'JV', description: '类、字段与 JSON 绑定', extension: 'java' },
+  { value: 'typescript', label: 'TypeScript', icon: 'TS', description: '接口、类型与联合类型', extension: 'ts' },
+  { value: 'typescript-zod', label: 'TypeScript + Zod', icon: 'TZ', description: '类型与运行时校验 Schema', extension: 'ts' },
+  { value: 'go', label: 'Go', icon: 'GO', description: '结构体与 JSON 标签', extension: 'go' },
+  { value: 'rust', label: 'Rust', icon: 'RS', description: 'Serde 结构体与枚举', extension: 'rs' },
+  { value: 'swift', label: 'Swift', icon: 'SW', description: 'Codable 结构体', extension: 'swift' },
+  { value: 'kotlin', label: 'Kotlin', icon: 'KT', description: 'data class 与可空类型', extension: 'kt' },
+  { value: 'python', label: 'Python', icon: 'PY', description: '类型注解与数据类', extension: 'py' },
+  { value: 'csharp', label: 'C#', icon: 'C#', description: '.NET 类型与 JSON 特性', extension: 'cs' },
+  { value: 'cplusplus', label: 'C++', icon: 'C+', description: '结构体与 JSON 转换', extension: 'cpp' },
+  { value: 'javascript', label: 'JavaScript', icon: 'JS', description: '转换函数与运行时类型', extension: 'js' },
+  { value: 'javascript-prop-types', label: 'JavaScript PropTypes', icon: 'PT', description: 'React PropTypes 声明', extension: 'js' },
+  { value: 'flow', label: 'Flow', icon: 'FL', description: 'Flow 静态类型声明', extension: 'js' },
+  { value: 'objective-c', label: 'Objective-C', icon: 'OC', description: '原生模型类', extension: 'm' },
+  { value: 'dart', label: 'Dart', icon: 'DA', description: 'Flutter 数据模型', extension: 'dart' },
+  { value: 'ruby', label: 'Ruby', icon: 'RB', description: 'Ruby 类型与转换方法', extension: 'rb' },
+  { value: 'php', label: 'PHP', icon: 'PH', description: 'PHP 类与转换方法', extension: 'php' },
+  { value: 'scala3', label: 'Scala 3', icon: 'SC', description: 'case class 类型模型', extension: 'scala' },
+  { value: 'haskell', label: 'Haskell', icon: 'HS', description: '记录与 Aeson 实例', extension: 'hs' },
+  { value: 'elm', label: 'Elm', icon: 'EL', description: '类型别名与解码器', extension: 'elm' },
+  { value: 'crystal', label: 'Crystal', icon: 'CR', description: 'Crystal 类型模型', extension: 'cr' },
+  { value: 'elixir', label: 'Elixir', icon: 'EX', description: '模块与结构体', extension: 'ex' },
+  { value: 'cjson', label: 'C (cJSON)', icon: 'C', description: 'C 结构体与 cJSON', extension: 'h' },
+  { value: 'json-schema', label: 'JSON Schema', icon: 'JS', description: 'Draft Schema 结构定义', extension: 'schema.json' },
+];
+
+const jsonTypesExample = `{
+  "id": 1042,
+  "name": "ByeTools",
+  "active": true,
+  "score": 4.8,
+  "tags": ["json", "types", "codegen"],
+  "owner": {
+    "login": "developer",
+    "verified": false
+  },
+  "createdAt": "2026-09-13T10:00:00Z"
+}`;
+
+let jsonTypesEditorRuntimePromise = null;
+
+function getJsonTypeLanguage(value) {
+  return jsonTypeLanguages.find((language) => language.value === value) || jsonTypeLanguages[0];
+}
+
+function jsonTypeLanguageOptionsMarkup(selected = 'java') {
+  return jsonTypeLanguages.map((language) => `<option value="${language.value}" data-icon="${language.icon}" data-label="${language.label}" data-description="${language.description}" ${language.value === selected ? 'selected' : ''}>${language.label}</option>`).join('');
+}
+
+function jsonTypesSpecificOptionsMarkup(language) {
+  if (language === 'java') return `<label class="json-types-field"><span>包名</span><input id="json-types-package" data-json-types-option type="text" value="io.byetools" spellcheck="false" /></label><label class="json-types-field"><span>数组类型</span><select id="json-types-array-type" data-json-types-option><option value="array">数组 T[]</option><option value="list" selected>List&lt;T&gt;</option></select></label><label class="json-types-field"><span>日期类型</span><select id="json-types-datetime-provider" data-json-types-option><option value="java8" selected>Java 8 Time</option><option value="legacy">Date / Calendar</option></select></label><label class="json-types-field"><span>缩略词风格</span><select id="json-types-acronym-style" data-json-types-option><option value="pascal" selected>Pascal</option><option value="camel">camel</option><option value="original">保持原样</option><option value="lowerCase">小写</option></select></label><label class="json-types-check"><input id="json-types-lombok" data-json-types-option type="checkbox" /><span>Lombok</span></label>`;
+  if (language === 'go') return `<label class="json-types-field"><span>包名</span><input id="json-types-package" data-json-types-option type="text" value="main" spellcheck="false" /></label><label class="json-types-field"><span>字段标签</span><input id="json-types-field-tags" data-json-types-option type="text" value="json" spellcheck="false" /></label><label class="json-types-check"><input id="json-types-omit-empty" data-json-types-option type="checkbox" /><span>omitempty</span></label>`;
+  if (language === 'rust') return `<label class="json-types-field"><span>字段可见性</span><select id="json-types-visibility" data-json-types-option><option value="public" selected>public</option><option value="crate">crate</option><option value="private">private</option></select></label><label class="json-types-check"><input id="json-types-derive-debug" data-json-types-option type="checkbox" checked /><span>Debug</span></label><label class="json-types-check"><input id="json-types-derive-clone" data-json-types-option type="checkbox" checked /><span>Clone</span></label><label class="json-types-check"><input id="json-types-derive-partial" data-json-types-option type="checkbox" /><span>PartialEq</span></label>`;
+  if (language === 'swift') return `<label class="json-types-field"><span>访问级别</span><select id="json-types-access-level" data-json-types-option><option value="internal" selected>internal</option><option value="public">public</option></select></label><label class="json-types-field"><span>类型形式</span><select id="json-types-struct-class" data-json-types-option><option value="struct" selected>struct</option><option value="class">class</option></select></label><label class="json-types-check"><input id="json-types-mutable" data-json-types-option type="checkbox" /><span>可变属性</span></label><label class="json-types-check"><input id="json-types-sendable" data-json-types-option type="checkbox" /><span>Sendable</span></label>`;
+  if (language === 'kotlin') return `<label class="json-types-field"><span>包名</span><input id="json-types-package" data-json-types-option type="text" value="io.byetools" spellcheck="false" /></label><label class="json-types-field"><span>JSON 框架</span><select id="json-types-kotlin-framework" data-json-types-option><option value="jackson" selected>Jackson</option><option value="kotlinx">kotlinx.serialization</option><option value="klaxon">Klaxon</option></select></label>`;
+  if (language === 'csharp') return `<label class="json-types-field"><span>命名空间</span><input id="json-types-namespace" data-json-types-option type="text" value="ByeTools.Models" spellcheck="false" /></label><label class="json-types-field"><span>JSON 框架</span><select id="json-types-csharp-framework" data-json-types-option><option value="SystemTextJson" selected>System.Text.Json</option><option value="NewtonSoft">Newtonsoft.Json</option></select></label><label class="json-types-field"><span>集合类型</span><select id="json-types-array-type" data-json-types-option><option value="array" selected>数组 T[]</option><option value="list">List&lt;T&gt;</option></select></label>`;
+  if (['typescript', 'flow'].includes(language)) return `<label class="json-types-check"><input id="json-types-prefer-types" data-json-types-option type="checkbox" /><span>优先 type</span></label><label class="json-types-check"><input id="json-types-readonly" data-json-types-option type="checkbox" /><span>readonly</span></label><label class="json-types-check"><input id="json-types-nice-names" data-json-types-option type="checkbox" /><span>规范字段名</span></label>`;
+  if (language === 'python') return `<label class="json-types-field"><span>Python 版本</span><select id="json-types-python-version" data-json-types-option><option value="3.10" selected>Python 3.10+</option><option value="3.9">Python 3.9</option><option value="3.7">Python 3.7</option><option value="3.6">Python 3.6</option></select></label><label class="json-types-check"><input id="json-types-pydantic" data-json-types-option type="checkbox" /><span>Pydantic BaseModel</span></label>`;
+  if (language === 'cplusplus') return `<label class="json-types-field"><span>命名空间</span><input id="json-types-namespace" data-json-types-option type="text" value="byetools" spellcheck="false" /></label>`;
+  return '<span class="json-types-options-empty">当前语言使用通用推断选项</span>';
+}
+
+function jsonTypesWorkbenchMarkup() {
+  return `<div class="json-types-workbench" id="json-types-workbench">
+    <div class="json-types-toolbar">
+      <div class="json-types-toolbar-copy"><span class="toolbar-label">类型生成</span><span class="json-types-local-badge"><i></i>浏览器本地运行</span></div>
+      <div class="json-types-toolbar-actions"><button class="secondary-button" type="button" data-json-types-action="clear">⌫ 清空</button><button class="secondary-button" type="button" data-json-types-action="copy" disabled>▣ 复制</button><button class="secondary-button" type="button" data-json-types-action="download" disabled>↓ 下载</button><button class="secondary-button" type="button" data-json-types-action="fullscreen" title="进入全屏"><span aria-hidden="true">↗</span> 全屏</button></div>
+    </div>
+    <div class="json-types-editor-layout">
+      <section class="json-types-pane" aria-label="JSON 输入区"><div class="json-types-pane-head"><div><span class="json-types-pane-dot is-input"></span><strong>JSON 输入</strong></div><div class="json-types-pane-tools"><label title="输入自动换行"><input id="json-types-input-wrap" type="checkbox" checked /><span>↵</span></label><span id="json-types-input-count">0 字符</span></div></div><div class="json-types-editor-host is-loading" id="json-types-input" aria-label="JSON 输入代码编辑器"><span>正在加载编辑器</span></div></section>
+      <section class="json-types-pane" aria-label="类型输出区"><div class="json-types-pane-head"><div><span class="json-types-pane-dot is-output"></span><strong>生成的类型</strong></div><div class="json-types-pane-tools"><label title="输出自动换行"><input id="json-types-output-wrap" type="checkbox" /><span>↵</span></label><span class="json-types-language-badge" id="json-types-language-badge">Java</span></div></div><div class="json-types-editor-host is-loading" id="json-types-output" aria-label="生成类型代码编辑器"><span>正在加载生成引擎</span></div></section>
+    </div>
+    <div class="json-types-settings">
+      <div class="json-types-settings-primary"><label class="json-types-field json-types-language-field"><span>语言</span><select id="json-types-language" aria-label="目标语言">${jsonTypeLanguageOptionsMarkup()}</select></label><label class="json-types-field json-types-root-field"><span>根类型名</span><input id="json-types-root" type="text" value="Root" maxlength="64" spellcheck="false" /></label><label class="json-types-check is-emphasis"><input id="json-types-just-types" type="checkbox" checked /><span>仅类型</span></label><button class="json-types-options-toggle" type="button" data-json-types-action="toggle-options" aria-expanded="true">☷ 选项 <span>⌃</span></button></div>
+      <div class="json-types-options" id="json-types-options"><div class="json-types-inference"><span>推断</span><label class="json-types-check"><input id="json-types-infer-dates" type="checkbox" checked /><span>日期时间</span></label><label class="json-types-check"><input id="json-types-infer-maps" type="checkbox" checked /><span>字典</span></label><label class="json-types-check"><input id="json-types-infer-enums" type="checkbox" checked /><span>枚举</span></label><label class="json-types-check"><input id="json-types-all-optional" type="checkbox" /><span>全部可选</span></label><label class="json-types-check"><input id="json-types-sort-fields" type="checkbox" /><span>字段排序</span></label></div><div class="json-types-specific-options" id="json-types-specific-options">${jsonTypesSpecificOptionsMarkup('java')}</div></div>
+    </div>
+    <div class="json-types-statusbar"><span id="json-types-status"><i></i>正在加载类型引擎</span><span id="json-types-output-meta">等待生成</span></div>
+    <div class="json-types-quick-actions"><span>快捷操作</span><input class="file-native-input" id="json-types-file-input" type="file" accept=".json,application/json,text/json" /><label class="secondary-button" for="json-types-file-input">↥ 打开文件</label><button class="secondary-button" type="button" data-json-types-action="sample">载入示例</button></div>
+  </div>`;
+}
+
+function loadJsonTypesEditorRuntime() {
+  if (!jsonTypesEditorRuntimePromise) {
+    jsonTypesEditorRuntimePromise = Promise.all([
+      import('codemirror'),
+      import('@codemirror/state'),
+      import('@codemirror/view'),
+      import('@codemirror/language'),
+      import('@codemirror/lang-json'),
+      import('@codemirror/lang-javascript'),
+      import('@codemirror/lang-java'),
+      import('@codemirror/lang-python'),
+      import('@codemirror/lang-rust'),
+      import('@codemirror/lang-cpp'),
+      import('@codemirror/legacy-modes/mode/clike'),
+      import('@codemirror/legacy-modes/mode/go'),
+      import('@codemirror/legacy-modes/mode/crystal'),
+      import('@codemirror/legacy-modes/mode/elm'),
+      import('@codemirror/legacy-modes/mode/haskell'),
+      import('@codemirror/legacy-modes/mode/ruby'),
+      import('@codemirror/legacy-modes/mode/swift'),
+    ]).then(([codemirror, stateModule, viewModule, languageModule, jsonModule, javascriptModule, javaModule, pythonModule, rustModule, cppModule, clikeModule, goModule, crystalModule, elmModule, haskellModule, rubyModule, swiftModule]) => ({ codemirror, stateModule, viewModule, languageModule, jsonModule, javascriptModule, javaModule, pythonModule, rustModule, cppModule, clikeModule, goModule, crystalModule, elmModule, haskellModule, rubyModule, swiftModule }));
+  }
+  return jsonTypesEditorRuntimePromise;
+}
+
+function jsonTypesLanguageSupport(runtime, language) {
+  const { StreamLanguage } = runtime.languageModule;
+  if (language === 'json-schema') return runtime.jsonModule.json();
+  if (['typescript', 'typescript-zod'].includes(language)) return runtime.javascriptModule.javascript({ typescript: true });
+  if (['javascript', 'javascript-prop-types', 'flow'].includes(language)) return runtime.javascriptModule.javascript();
+  if (language === 'java') return runtime.javaModule.java();
+  if (language === 'python') return runtime.pythonModule.python();
+  if (language === 'rust') return runtime.rustModule.rust();
+  if (language === 'cplusplus') return runtime.cppModule.cpp();
+  const legacyModes = {
+    cjson: runtime.clikeModule.c,
+    csharp: runtime.clikeModule.csharp,
+    dart: runtime.clikeModule.dart,
+    kotlin: runtime.clikeModule.kotlin,
+    'objective-c': runtime.clikeModule.objectiveC,
+    php: runtime.clikeModule.c,
+    scala3: runtime.clikeModule.scala,
+    go: runtime.goModule.go,
+    crystal: runtime.crystalModule.crystal,
+    elm: runtime.elmModule.elm,
+    haskell: runtime.haskellModule.haskell,
+    ruby: runtime.rubyModule.ruby,
+    elixir: runtime.rubyModule.ruby,
+    swift: runtime.swiftModule.swift,
+  };
+  return legacyModes[language] ? StreamLanguage.define(legacyModes[language]) : [];
+}
+
+async function bindJsonTypesWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const workbench = content.querySelector('#json-types-workbench');
+  const inputHost = content.querySelector('#json-types-input');
+  const outputHost = content.querySelector('#json-types-output');
+  const languageSelect = content.querySelector('#json-types-language');
+  const languageBadge = content.querySelector('#json-types-language-badge');
+  const rootInput = content.querySelector('#json-types-root');
+  const optionsPanel = content.querySelector('#json-types-options');
+  const specificOptions = content.querySelector('#json-types-specific-options');
+  const status = content.querySelector('#json-types-status');
+  const outputMeta = content.querySelector('#json-types-output-meta');
+  const copyButton = content.querySelector('[data-json-types-action="copy"]');
+  const downloadButton = content.querySelector('[data-json-types-action="download"]');
+  const fullscreenButton = content.querySelector('[data-json-types-action="fullscreen"]');
+  const fileInput = content.querySelector('#json-types-file-input');
+  const originalBodyOverflow = document.body.style.overflow;
+  let disposed = false;
+  let inputView = null;
+  let outputView = null;
+  let worker = null;
+  let generationTimer = 0;
+  let persistTimer = 0;
+  let requestId = 0;
+  let latestRequestId = 0;
+  let outputCode = '';
+  let suppressInputUpdate = false;
+  let currentLanguage = languageSelect.value;
+  const specificValues = {};
+
+  const cleanup = () => {
+    disposed = true;
+    clearTimeout(generationTimer);
+    clearTimeout(persistTimer);
+    worker?.terminate();
+    inputView?.destroy();
+    outputView?.destroy();
+    document.removeEventListener('keydown', onDocumentKeydown);
+    document.body.style.overflow = originalBodyOverflow;
+  };
+  activeWorkspaceCleanup = cleanup;
+
+  const renderStatus = (message, tone = '') => {
+    status.className = tone ? `is-${tone}` : '';
+    status.innerHTML = `<i></i>${escapeHtml(message)}`;
+  };
+
+  const fieldValue = (id, fallback = '') => {
+    const field = content.querySelector(`#${id}`);
+    if (!field) return fallback;
+    return field.type === 'checkbox' ? field.checked : field.value;
+  };
+
+  const collectRendererOptions = () => {
+    const options = { 'just-types': Boolean(fieldValue('json-types-just-types')) };
+    if (currentLanguage === 'java') Object.assign(options, { package: fieldValue('json-types-package', 'io.byetools'), 'array-type': fieldValue('json-types-array-type', 'list'), 'datetime-provider': fieldValue('json-types-datetime-provider', 'java8'), 'acronym-style': fieldValue('json-types-acronym-style', 'pascal'), lombok: Boolean(fieldValue('json-types-lombok')) });
+    if (currentLanguage === 'go') Object.assign(options, { package: fieldValue('json-types-package', 'main'), 'field-tags': fieldValue('json-types-field-tags', 'json'), 'omit-empty': Boolean(fieldValue('json-types-omit-empty')) });
+    if (currentLanguage === 'rust') Object.assign(options, { visibility: fieldValue('json-types-visibility', 'public'), 'derive-debug': Boolean(fieldValue('json-types-derive-debug')), 'derive-clone': Boolean(fieldValue('json-types-derive-clone')), 'derive-partial-eq': Boolean(fieldValue('json-types-derive-partial')) });
+    if (currentLanguage === 'swift') Object.assign(options, { 'access-level': fieldValue('json-types-access-level', 'internal'), 'struct-or-class': fieldValue('json-types-struct-class', 'struct'), 'mutable-properties': Boolean(fieldValue('json-types-mutable')), sendable: Boolean(fieldValue('json-types-sendable')) });
+    if (currentLanguage === 'kotlin') Object.assign(options, { package: fieldValue('json-types-package', 'io.byetools'), framework: fieldValue('json-types-kotlin-framework', 'jackson') });
+    if (currentLanguage === 'csharp') Object.assign(options, { namespace: fieldValue('json-types-namespace', 'ByeTools.Models'), framework: fieldValue('json-types-csharp-framework', 'SystemTextJson'), 'array-type': fieldValue('json-types-array-type', 'array') });
+    if (['typescript', 'flow'].includes(currentLanguage)) Object.assign(options, { 'prefer-types': Boolean(fieldValue('json-types-prefer-types')), readonly: Boolean(fieldValue('json-types-readonly')), 'nice-property-names': Boolean(fieldValue('json-types-nice-names')) });
+    if (currentLanguage === 'python') Object.assign(options, { 'python-version': fieldValue('json-types-python-version', '3.10'), 'pydantic-base-model': Boolean(fieldValue('json-types-pydantic')) });
+    if (currentLanguage === 'cplusplus') Object.assign(options, { namespace: fieldValue('json-types-namespace', 'byetools') });
+    return options;
+  };
+
+  const collectSpecificValues = () => {
+    const values = {};
+    specificOptions.querySelectorAll('[data-json-types-option]').forEach((field) => { values[field.id] = field.type === 'checkbox' ? field.checked : field.value; });
+    specificValues[currentLanguage] = values;
+  };
+
+  const applySpecificValues = () => {
+    const values = specificValues[currentLanguage] || {};
+    Object.entries(values).forEach(([id, value]) => {
+      const field = content.querySelector(`#${id}`);
+      if (!field) return;
+      if (field.type === 'checkbox') field.checked = Boolean(value);
+      else field.value = value;
+      if (field.tagName === 'SELECT') syncBtSelect(field);
+    });
+  };
+
+  const persistState = () => {
+    if (!storage || !inputView) return;
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => {
+      collectSpecificValues();
+      Promise.all([
+        storage.setDraft('json-to-types', { draft: inputView.state.doc.toString() }),
+        storage.setSetting('json-types-preferences', {
+          language: currentLanguage,
+          rootName: rootInput.value,
+          justTypes: Boolean(fieldValue('json-types-just-types')),
+          inferDates: Boolean(fieldValue('json-types-infer-dates')),
+          inferMaps: Boolean(fieldValue('json-types-infer-maps')),
+          inferEnums: Boolean(fieldValue('json-types-infer-enums')),
+          allOptional: Boolean(fieldValue('json-types-all-optional')),
+          sortFields: Boolean(fieldValue('json-types-sort-fields')),
+          inputWrap: content.querySelector('#json-types-input-wrap').checked,
+          outputWrap: content.querySelector('#json-types-output-wrap').checked,
+          specificValues,
+        }),
+      ]).catch(() => {});
+    }, 220);
+  };
+
+  const updateInputCount = () => {
+    const value = inputView?.state.doc.toString() || '';
+    content.querySelector('#json-types-input-count').textContent = `${value.length.toLocaleString('zh-CN')} 字符`;
+  };
+
+  const setEditorText = (view, value, suppress = false) => {
+    if (!view) return;
+    if (suppress) suppressInputUpdate = true;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
+    if (suppress) suppressInputUpdate = false;
+  };
+
+  const setOutput = (value) => {
+    outputCode = value;
+    setEditorText(outputView, value);
+    copyButton.disabled = !value;
+    downloadButton.disabled = !value;
+    const lines = value ? value.split('\n').length : 0;
+    outputMeta.textContent = value ? `${lines.toLocaleString('zh-CN')} 行 · ${value.length.toLocaleString('zh-CN')} 字符` : '等待生成';
+  };
+
+  const generationError = (message) => {
+    setOutput('');
+    renderStatus(message, 'error');
+  };
+
+  const generate = () => {
+    if (!worker || !inputView) return;
+    const id = ++requestId;
+    latestRequestId = id;
+    const json = inputView.state.doc.toString();
+    updateInputCount();
+    if (!json.trim()) { generationError('请输入 JSON 样本'); return; }
+    try { JSON.parse(json); } catch (error) { generationError(`JSON 格式有误：${error.message}`); return; }
+    const rootName = rootInput.value.trim();
+    if (!rootName) { generationError('请输入根类型名'); return; }
+    if (/[^\p{L}\p{N}_$\- ]/u.test(rootName)) { generationError('根类型名包含不支持的字符'); return; }
+    renderStatus(`正在生成 ${getJsonTypeLanguage(currentLanguage).label} 类型`, 'running');
+    worker.postMessage({
+      id,
+      json,
+      language: currentLanguage,
+      rootName,
+      rendererOptions: collectRendererOptions(),
+      inference: {
+        inferDateTimes: Boolean(fieldValue('json-types-infer-dates')),
+        inferMaps: Boolean(fieldValue('json-types-infer-maps')),
+        inferEnums: Boolean(fieldValue('json-types-infer-enums')),
+        inferUuids: true,
+        inferIntegerStrings: false,
+        inferBooleanStrings: false,
+        allPropertiesOptional: Boolean(fieldValue('json-types-all-optional')),
+        alphabetizeProperties: Boolean(fieldValue('json-types-sort-fields')),
+      },
+    });
+    persistState();
+  };
+
+  const scheduleGeneration = () => {
+    clearTimeout(generationTimer);
+    generationTimer = setTimeout(generate, 260);
+  };
+
+  const renderSpecificOptions = () => {
+    specificOptions.innerHTML = jsonTypesSpecificOptionsMarkup(currentLanguage);
+    applySpecificValues();
+    enhanceBtSelects(specificOptions);
+  };
+
+  const toggleFullscreen = (force) => {
+    const enabled = typeof force === 'boolean' ? force : !workbench.classList.contains('is-fullscreen');
+    workbench.classList.toggle('is-fullscreen', enabled);
+    document.body.style.overflow = enabled ? 'hidden' : originalBodyOverflow;
+    fullscreenButton.innerHTML = enabled ? '<span aria-hidden="true">↙</span> 退出全屏' : '<span aria-hidden="true">↗</span> 全屏';
+    fullscreenButton.title = enabled ? '退出全屏' : '进入全屏';
+  };
+
+  function onDocumentKeydown(event) {
+    if (event.key === 'Escape' && workbench.classList.contains('is-fullscreen')) toggleFullscreen(false);
+    if (event.key.toLowerCase() === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.target.closest('input, textarea, select, .cm-editor, [contenteditable="true"]')) {
+      event.preventDefault();
+      toggleFullscreen();
+    }
+  }
+
+  try {
+    const savedStatePromise = storage ? Promise.all([storage.getDraft('json-to-types'), storage.getSetting('json-types-preferences', {})]).catch(() => [null, {}]) : Promise.resolve([null, {}]);
+    const [runtime, savedState] = await Promise.all([loadJsonTypesEditorRuntime(), savedStatePromise]);
+    if (disposed || !document.body.contains(workbench)) return;
+    const [savedDraft, savedPreferences] = savedState;
+    if (savedPreferences?.language && jsonTypeLanguages.some((language) => language.value === savedPreferences.language)) languageSelect.value = savedPreferences.language;
+    currentLanguage = languageSelect.value;
+    rootInput.value = savedPreferences?.rootName || rootInput.value;
+    const preferenceFields = {
+      'json-types-just-types': savedPreferences?.justTypes,
+      'json-types-infer-dates': savedPreferences?.inferDates,
+      'json-types-infer-maps': savedPreferences?.inferMaps,
+      'json-types-infer-enums': savedPreferences?.inferEnums,
+      'json-types-all-optional': savedPreferences?.allOptional,
+      'json-types-sort-fields': savedPreferences?.sortFields,
+      'json-types-input-wrap': savedPreferences?.inputWrap,
+      'json-types-output-wrap': savedPreferences?.outputWrap,
+    };
+    Object.entries(preferenceFields).forEach(([id, value]) => { if (typeof value === 'boolean') content.querySelector(`#${id}`).checked = value; });
+    Object.assign(specificValues, savedPreferences?.specificValues || {});
+    syncBtSelect(languageSelect);
+    languageBadge.textContent = getJsonTypeLanguage(currentLanguage).label;
+    renderSpecificOptions();
+
+    const { EditorState, Compartment } = runtime.stateModule;
+    const { EditorView } = runtime.viewModule;
+    const inputWrapCompartment = new Compartment();
+    const outputWrapCompartment = new Compartment();
+    const outputLanguageCompartment = new Compartment();
+    const editorTheme = EditorView.theme({
+      '&': { height: '100%', backgroundColor: 'transparent', color: 'var(--text)' },
+      '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--font-mono)', fontSize: '13px', lineHeight: '1.72' },
+      '.cm-content': { minHeight: '100%', padding: '18px 8px' },
+      '.cm-line': { padding: '0 10px' },
+      '.cm-gutters': { borderRight: '1px solid var(--line)', backgroundColor: 'var(--bg-soft)', color: 'var(--text-muted)' },
+      '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--brand) 8%, transparent)' },
+      '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'color-mix(in srgb, var(--brand) 27%, transparent) !important' },
+      '.cm-cursor': { borderLeftColor: 'var(--brand-bright)' },
+      '.cm-foldPlaceholder': { border: '1px solid var(--line-strong)', backgroundColor: 'var(--panel-strong)', color: 'var(--text-muted)' },
+      '&.cm-focused': { outline: 'none' },
+    });
+    inputHost.textContent = '';
+    outputHost.textContent = '';
+    inputHost.classList.remove('is-loading');
+    outputHost.classList.remove('is-loading');
+    const initialJson = savedDraft?.payload?.draft || jsonTypesExample;
+    inputView = new EditorView({
+      doc: initialJson,
+      extensions: [runtime.codemirror.basicSetup, runtime.jsonModule.json(), editorTheme, inputWrapCompartment.of(content.querySelector('#json-types-input-wrap').checked ? EditorView.lineWrapping : []), EditorView.contentAttributes.of({ 'aria-label': 'JSON 输入代码编辑器' }), EditorView.updateListener.of((update) => { if (!update.docChanged || suppressInputUpdate) return; updateInputCount(); scheduleGeneration(); persistState(); })],
+      parent: inputHost,
+    });
+    outputView = new EditorView({
+      doc: '',
+      extensions: [runtime.codemirror.basicSetup, editorTheme, outputLanguageCompartment.of(jsonTypesLanguageSupport(runtime, currentLanguage)), outputWrapCompartment.of(content.querySelector('#json-types-output-wrap').checked ? EditorView.lineWrapping : []), EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.contentAttributes.of({ 'aria-label': '生成类型代码编辑器', tabindex: '0' })],
+      parent: outputHost,
+    });
+    worker = new Worker(new URL('./json-types.worker.js', import.meta.url), { type: 'module' });
+    worker.addEventListener('message', (event) => {
+      const result = event.data || {};
+      if (disposed || result.id !== latestRequestId) return;
+      if (!result.ok) { generationError(`生成失败：${result.error || '未知错误'}`); return; }
+      setOutput(result.code || '');
+      renderStatus(`${getJsonTypeLanguage(currentLanguage).label} 类型已生成`, 'success');
+    });
+    worker.addEventListener('error', () => { if (!disposed) generationError('类型生成引擎加载失败'); });
+
+    languageSelect.addEventListener('change', () => {
+      collectSpecificValues();
+      currentLanguage = languageSelect.value;
+      languageBadge.textContent = getJsonTypeLanguage(currentLanguage).label;
+      renderSpecificOptions();
+      outputView.dispatch({ effects: outputLanguageCompartment.reconfigure(jsonTypesLanguageSupport(runtime, currentLanguage)) });
+      scheduleGeneration();
+      persistState();
+    });
+    rootInput.addEventListener('input', () => { scheduleGeneration(); persistState(); });
+    optionsPanel.addEventListener('input', (event) => { if (event.target.matches('[data-json-types-option]')) collectSpecificValues(); scheduleGeneration(); persistState(); });
+    optionsPanel.addEventListener('change', (event) => { if (event.target.matches('[data-json-types-option]')) collectSpecificValues(); scheduleGeneration(); persistState(); });
+    content.querySelectorAll('#json-types-just-types, #json-types-infer-dates, #json-types-infer-maps, #json-types-infer-enums, #json-types-all-optional, #json-types-sort-fields').forEach((field) => field.addEventListener('change', () => { scheduleGeneration(); persistState(); }));
+    content.querySelector('#json-types-input-wrap').addEventListener('change', (event) => { inputView.dispatch({ effects: inputWrapCompartment.reconfigure(event.target.checked ? EditorView.lineWrapping : []) }); persistState(); });
+    content.querySelector('#json-types-output-wrap').addEventListener('change', (event) => { outputView.dispatch({ effects: outputWrapCompartment.reconfigure(event.target.checked ? EditorView.lineWrapping : []) }); persistState(); });
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      try {
+        if (file.size > 10 * 1024 * 1024) throw new Error('JSON 文件不能超过 10 MB');
+        const text = await file.text();
+        JSON.parse(text);
+        setEditorText(inputView, text, true);
+        updateInputCount();
+        scheduleGeneration();
+        persistState();
+        showToast(`已打开 ${file.name}`);
+      } catch (error) { generationError(`文件读取失败：${error.message}`); }
+      fileInput.value = '';
+    });
+    content.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-json-types-action]');
+      if (!button) return;
+      const action = button.dataset.jsonTypesAction;
+      if (action === 'clear') { setEditorText(inputView, '', true); setOutput(''); updateInputCount(); generationError('请输入 JSON 样本'); persistState(); inputView.focus(); }
+      if (action === 'copy' && outputCode) copyText(outputCode).then(() => showToast('类型定义已复制'));
+      if (action === 'download' && outputCode) {
+        const language = getJsonTypeLanguage(currentLanguage);
+        const name = rootInput.value.trim().replace(/[^\p{L}\p{N}_-]+/gu, '-') || 'Root';
+        downloadBlob(new Blob([outputCode], { type: 'text/plain;charset=utf-8' }), `${name}.${language.extension}`);
+        showToast('类型定义已下载');
+      }
+      if (action === 'fullscreen') toggleFullscreen();
+      if (action === 'sample') { setEditorText(inputView, jsonTypesExample, true); updateInputCount(); scheduleGeneration(); persistState(); inputView.focus(); }
+      if (action === 'toggle-options') {
+        const expanded = button.getAttribute('aria-expanded') !== 'true';
+        button.setAttribute('aria-expanded', String(expanded));
+        button.querySelector('span').textContent = expanded ? '⌃' : '⌄';
+        optionsPanel.hidden = !expanded;
+      }
+    });
+    document.addEventListener('keydown', onDocumentKeydown);
+    updateInputCount();
+    generate();
+  } catch (error) {
+    if (disposed) return;
+    inputHost.classList.remove('is-loading');
+    outputHost.classList.remove('is-loading');
+    inputHost.textContent = '编辑器加载失败';
+    outputHost.textContent = '类型生成引擎加载失败';
+    generationError(error.message || '工具初始化失败');
+  }
+}
 
 const timeUnitFactors = { millisecond: 1, second: 1000, minute: 60000, hour: 3600000, day: 86400000, week: 604800000, month: 2592000000, year: 31536000000 };
 const timeUnitLabels = { millisecond: '毫秒', second: '秒', minute: '分', hour: '时', day: '天', week: '周', month: '月（按 30 天）', year: '年（按 365 天）' };
@@ -1099,6 +1620,48 @@ function ipWorkbenchMarkup() {
   </div>`;
 }
 
+function messageQueueWorkbenchMarkup() {
+  const desktopMq = Boolean(storage?.isDesktop);
+  return `<div class="special-workbench mq-workbench" data-mq-workbench>
+    <div class="special-toolbar mq-toolbar">
+      <div class="mq-toolbar-copy"><span class="toolbar-label">消息中间件</span><span class="mq-capability-badge ${desktopMq ? 'is-ready' : ''}"><i></i>${desktopMq ? '桌面端已启用真实连接' : 'Web 仅支持配置与编辑'}</span></div>
+      <div class="mq-toolbar-actions">
+        <button class="secondary-button" type="button" data-mq-action="test">测试连接</button>
+        <button class="primary-button" type="button" data-mq-action="send">发送消息</button>
+        <button class="secondary-button" type="button" data-mq-action="consume-start">开始消费</button>
+        <button class="secondary-button" type="button" data-mq-action="consume-stop" disabled>停止消费</button>
+        <button class="secondary-button" type="button" data-mq-action="clear">清空</button>
+      </div>
+    </div>
+    <div class="mq-layout">
+      <section class="workspace-card mq-config-card">
+        <div class="workspace-card-head"><div><strong>连接配置</strong><small>填写 Broker 与认证信息，密码不会出现在消息日志中</small></div><span class="code-badge">BROKER</span></div>
+        <div class="mq-config-manager"><div class="mq-config-manager-head"><div><strong>配置管理</strong><small>保存后可在当前设备查询并应用连接参数</small></div><span class="code-badge">CONFIG</span></div><div class="mq-config-manager-form"><label class="mq-field"><span>配置名称</span><input id="mq-config-name" type="text" value="本地 MQTT" spellcheck="false" placeholder="例如：测试环境" /></label><div class="mq-config-manager-actions"><button class="primary-button" type="button" data-mq-action="save-config">保存配置</button><button class="secondary-button" type="button" data-mq-action="query-configs">查询配置</button></div></div><div class="mq-config-list" id="mq-config-list" hidden></div></div>
+        <div class="mq-form-grid">
+          <label class="mq-field mq-field-wide"><span>消息中间件</span><select id="mq-broker" aria-label="消息中间件"><option value="mqtt" data-icon="MQ" data-label="MQTT" data-description="轻量发布与订阅">MQTT</option><option value="kafka" data-icon="KF" data-label="Kafka" data-description="主题生产与消费">Kafka</option><option value="rabbitmq" data-icon="RM" data-label="RabbitMQ" data-description="交换机与队列消息">RabbitMQ</option><option value="rocketmq" data-icon="RQ" data-label="RocketMQ" data-description="5.x Proxy 消息服务">RocketMQ</option></select></label>
+          <label class="mq-field mq-field-wide"><span id="mq-address-label">Broker 地址</span><input id="mq-address" type="text" value="localhost" spellcheck="false" placeholder="例如 mqtt.example.com" /></label>
+          <label class="mq-field"><span>端口</span><input id="mq-port" type="number" value="1883" min="1" max="65535" inputmode="numeric" /></label>
+          <label class="mq-field"><span id="mq-username-label">用户名</span><input id="mq-username" type="text" spellcheck="false" autocomplete="username" placeholder="可选" /></label>
+          <label class="mq-field"><span id="mq-password-label">密码</span><input id="mq-password" type="password" spellcheck="false" autocomplete="current-password" placeholder="可选" /></label>
+          <label class="mq-switch-field"><input id="mq-tls" type="checkbox" /><span><b>启用 TLS</b><small>使用加密传输连接 Broker</small></span></label>
+        </div>
+        <div class="mq-target-section"><div class="mq-target-heading"><div><strong>消息目标</strong><small id="mq-target-caption">MQTT Topic 与服务质量</small></div><span class="code-badge" id="mq-target-badge">TOPIC</span></div><div class="mq-target-fields" id="mq-target-fields"></div></div>
+        <div class="mq-status-panel" id="mq-connection-status" role="status"><span class="mq-status-dot"></span><div><strong>等待操作</strong><small>${desktopMq ? '桌面端会使用当前配置连接 Broker。' : 'Web 端不会建立真实 MQ 连接，请使用桌面客户端执行操作。'}</small></div></div>
+      </section>
+      <section class="workspace-card mq-message-card">
+        <div class="workspace-card-head"><div><strong>消息内容</strong><small>发送时作为消息正文，消费时用于查看目标配置</small></div><div class="mq-message-head-actions"><span class="code-badge" id="mq-message-badge">TEXT</span><div class="mq-message-modes" role="group" aria-label="消息格式"><button type="button" class="is-active" data-mq-format="text">文本</button><button type="button" data-mq-format="json">JSON</button></div></div></div>
+        <textarea id="mq-message" spellcheck="false" placeholder="输入要发送的消息…">ByeTools MQ message</textarea>
+        <div class="mq-message-tools"><span id="mq-message-status">文本消息 · 20 字符</span><div><button class="text-button" type="button" data-mq-action="format">格式化 JSON</button><button class="text-button" type="button" data-mq-action="clear-message">清空内容</button><button class="text-button" type="button" data-mq-action="copy-message">复制内容</button></div></div>
+      </section>
+    </div>
+    <section class="workspace-card mq-log-card">
+      <div class="workspace-card-head"><div><strong>消息日志</strong><small>${desktopMq ? '记录桌面端连接、发送与消费结果' : '仅记录本地操作意图，不代表 Broker 已接收或返回消息'}</small></div><div class="mq-log-head-actions"><button class="text-button" type="button" data-mq-action="export-consumed">导出消费消息</button><button class="text-button" type="button" data-mq-action="clear-log">清空日志</button></div></div>
+      <div class="mq-log-table-wrap"><table class="mq-log-table"><thead><tr><th>时间</th><th>方向</th><th>状态</th><th>中间件</th><th>内容摘要</th></tr></thead><tbody id="mq-log-body"><tr class="mq-log-empty"><td colspan="5">暂无操作日志</td></tr></tbody></table></div>
+    </section>
+    <aside class="info-panel mq-info-panel"><div class="panel-heading"><span class="panel-heading-mark"></span><div><strong>桌面端能力说明</strong><small>${desktopMq ? '当前运行在 Tauri 桌面端' : '浏览器受网络沙箱限制'}</small></div></div><div class="info-list"><div><b>连接能力</b><span>${desktopMq ? 'MQTT、Kafka、RabbitMQ、RocketMQ 均由桌面端直接连接和操作。' : '可填写 Broker、Topic、队列和消息内容，支持本地格式校验。'}</span></div><div><b>发送与消费</b><span>${desktopMq ? '支持真实测试连接、发送消息、持续消费和停止消费者。' : '请使用桌面客户端执行真实发送与消费。'}</span></div><div><b>隐私边界</b><span>密码或 SecretKey 只用于当前桌面会话连接，不会写入消息日志。</span></div></div><div class="info-callout">${desktopMq ? 'RocketMQ 使用 5.x Proxy Endpoint；RabbitMQ 的 Exchange、Queue 与绑定关系需提前创建。' : '点击发送或消费后会显示桌面端提示，不会伪造成功消息。'}</div></aside>
+  </div>`;
+}
+
 function curlWorkbenchMarkup() {
   return `<div class="special-workbench curl-workbench">
     <div class="special-toolbar curl-toolbar"><label class="special-select-field"><span>目标语言</span><select id="curl-language"><option value="fetch">Fetch</option><option value="axios">Axios</option><option value="python">Python</option><option value="go">Go</option></select></label><button class="primary-button" data-tool-action="curl-parse">解析并转换</button><button class="secondary-button" data-tool-action="curl-copy">复制代码</button><button class="secondary-button" data-tool-action="curl-clear">清空</button><span class="special-toolbar-note"><i></i>支持 URL、请求方法、请求头和请求体</span></div>
@@ -1112,6 +1675,41 @@ function htmlWorkbenchMarkup() {
     <div class="special-toolbar"><span class="toolbar-label">HTML 实体转换</span><button class="primary-button" data-tool-action="html-encode">实体编码</button><button class="secondary-button" data-tool-action="html-decode">实体解码</button><button class="secondary-button" data-tool-action="html-clear">清空</button><button class="secondary-button" data-tool-action="html-copy">复制结果</button><span class="special-toolbar-note"><i></i>支持中文、引号和特殊字符</span></div>
     <div class="tool-panel html-panel"><section class="workspace-card"><div class="workspace-card-head"><div><strong>输入内容</strong><small>原始 HTML 或实体文本</small></div><span class="code-badge">TEXT</span></div><textarea id="html-input" spellcheck="false" placeholder="输入 HTML 片段…">&lt;h1&gt;ByeTools&lt;/h1&gt;
 &lt;p&gt;开发者工具箱&lt;/p&gt;</textarea></section><section class="workspace-card"><div class="workspace-card-head"><div><strong>转换结果</strong><small id="html-output-caption">等待操作</small></div><span class="code-badge">HTML</span></div><pre id="html-output" aria-live="polite"></pre><div class="workspace-card-foot"><span id="html-status">输入内容后选择转换方式</span><button class="text-button" data-tool-action="html-copy">复制</button></div></section></div>
+  </div>`;
+}
+
+function xmlFormatWorkbenchMarkup() {
+  return `<div class="special-workbench formatter-workbench xml-format-workbench">
+    <div class="special-toolbar formatter-toolbar"><input class="file-native-input" id="xml-format-file" type="file" accept=".xml,text/xml,application/xml" /><label class="formatter-file-button" for="xml-format-file"><span aria-hidden="true">↥</span>打开 XML</label><button class="primary-button" data-tool-action="xml-format">格式化</button><button class="secondary-button" data-tool-action="xml-minify">压缩</button><button class="secondary-button" data-tool-action="xml-sample">示例</button><button class="secondary-button" data-tool-action="xml-clear">清空</button><button class="secondary-button" data-tool-action="xml-copy">复制结果</button><button class="secondary-button" data-tool-action="xml-download">下载</button><button class="secondary-button" data-tool-action="xml-fullscreen">全屏</button><span class="special-toolbar-note"><i></i>浏览器本地解析，不上传文档</span></div>
+    <div class="formatter-status" id="xml-format-status"><span class="formatter-status-dot"></span><span>等待输入</span><small>XML · UTF-8</small></div>
+    <div class="formatter-layout"><section class="workspace-card formatter-editor-card"><div class="workspace-card-head"><div><strong>XML 输入</strong><small>支持属性、嵌套节点和命名空间</small></div><span class="code-badge">XML</span></div><textarea class="formatter-editor" id="xml-format-input" spellcheck="false" wrap="off" aria-label="XML 输入">&lt;catalog&gt;
+  &lt;book id="bk101"&gt;
+    &lt;title&gt;ByeTools 开发者工具箱&lt;/title&gt;
+    &lt;author&gt;ByeTools&lt;/author&gt;
+  &lt;/book&gt;
+&lt;/catalog&gt;</textarea><div class="workspace-card-foot"><span id="xml-format-input-meta">0 个字符</span><span>实时校验</span></div></section><section class="workspace-card formatter-output-card"><div class="workspace-card-head"><div><strong>格式化结果</strong><small>解析错误会在这里提示</small></div><span class="code-badge">OUTPUT</span></div><pre class="formatter-output" id="xml-format-output" aria-live="polite"></pre><div class="workspace-card-foot"><span id="xml-format-output-meta">等待操作</span><button class="text-button" data-tool-action="xml-copy">复制</button></div></section></div>
+  </div>`;
+}
+
+function xmlConverterWorkbenchMarkup() {
+  return `<div class="special-workbench formatter-workbench xml-converter-workbench">
+    <div class="special-toolbar formatter-toolbar"><input class="file-native-input" id="xml-converter-file" type="file" accept=".xml,text/xml,application/xml" /><label class="formatter-file-button" for="xml-converter-file"><span aria-hidden="true">↥</span>打开 XML</label><label class="special-select-field formatter-select-field"><span>输出格式</span><select id="xml-converter-format"><option value="json">JSON</option><option value="yaml">YAML</option><option value="toml">TOML</option><option value="javascript">JS 对象</option><option value="php">PHP 数组</option></select></label><button class="primary-button" data-tool-action="xml-convert">转换</button><button class="secondary-button" data-tool-action="xml-converter-sample">示例</button><button class="secondary-button" data-tool-action="xml-converter-clear">清空</button><button class="secondary-button" data-tool-action="xml-converter-copy">复制结果</button><button class="secondary-button" data-tool-action="xml-converter-download">下载</button><button class="secondary-button" data-tool-action="xml-converter-fullscreen">全屏</button><span class="special-toolbar-note"><i></i>结构转换在浏览器本地完成</span></div>
+    <div class="formatter-options"><label class="formatter-option-check"><input id="xml-ignore-attributes" type="checkbox" /><span>忽略 XML 属性</span></label><label class="formatter-option-check"><input id="xml-strip-namespace" type="checkbox" checked /><span>去除命名空间前缀</span></label><label class="formatter-option-check"><input id="xml-force-array" type="checkbox" /><span>单元素也转数组</span></label><label class="special-input-field formatter-prefix-field"><span>属性前缀</span><input id="xml-attribute-prefix" type="text" value="@" maxlength="4" aria-label="属性前缀" /></label><label class="special-select-field formatter-indent-field"><span>缩进</span><select id="xml-converter-indent"><option value="2">2 空格</option><option value="4">4 空格</option><option value="tab">制表符</option></select></label></div>
+    <div class="formatter-status" id="xml-converter-status"><span class="formatter-status-dot"></span><span>等待输入</span><small>XML → JSON</small></div>
+    <div class="formatter-layout"><section class="workspace-card formatter-editor-card"><div class="workspace-card-head"><div><strong>XML 输入</strong><small>重复节点会自动合并为数组</small></div><span class="code-badge">XML</span></div><textarea class="formatter-editor" id="xml-converter-input" spellcheck="false" wrap="off" aria-label="XML 转换输入">&lt;user id="42"&gt;
+  &lt;name&gt;ByeTools&lt;/name&gt;
+  &lt;roles&gt;developer&lt;/roles&gt;
+  &lt;roles&gt;designer&lt;/roles&gt;
+&lt;/user&gt;</textarea><div class="workspace-card-foot"><span id="xml-converter-input-meta">0 个字符</span><span>本地解析</span></div></section><section class="workspace-card formatter-output-card"><div class="workspace-card-head"><div><strong>转换结果</strong><small id="xml-converter-output-caption">JSON 对象</small></div><span class="code-badge" id="xml-converter-output-badge">JSON</span></div><pre class="formatter-output" id="xml-converter-output" aria-live="polite"></pre><div class="workspace-card-foot"><span id="xml-converter-output-meta">等待转换</span><button class="text-button" data-tool-action="xml-converter-copy">复制</button></div></section></div>
+  </div>`;
+}
+
+function sqlFormatWorkbenchMarkup() {
+  return `<div class="special-workbench formatter-workbench sql-format-workbench">
+    <div class="special-toolbar formatter-toolbar"><button class="primary-button" data-tool-action="sql-format">格式化</button><button class="secondary-button" data-tool-action="sql-minify">压缩</button><button class="secondary-button" data-tool-action="sql-sample">示例</button><button class="secondary-button" data-tool-action="sql-clear">清空</button><button class="secondary-button" data-tool-action="sql-copy">复制结果</button><button class="secondary-button" data-tool-action="sql-download">下载</button><button class="secondary-button" data-tool-action="sql-fullscreen">全屏</button><span class="special-toolbar-note"><i></i>仅在当前设备整理 SQL，不执行数据库操作</span></div>
+    <div class="formatter-options sql-options"><label class="special-select-field"><span>数据库方言</span><select id="sql-dialect"><option value="mysql">MySQL</option><option value="postgresql">PostgreSQL</option><option value="sqlite">SQLite</option><option value="sqlserver">SQL Server</option></select></label><label class="special-select-field"><span>关键字大小写</span><select id="sql-keyword-case"><option value="original">原样</option><option value="upper" selected>大写</option><option value="lower">小写</option></select></label><label class="special-select-field"><span>缩进</span><select id="sql-indent"><option value="2" selected>2 空格</option><option value="4">4 空格</option><option value="tab">制表符</option></select></label><label class="formatter-option-check"><input id="sql-break-logic" type="checkbox" checked /><span>AND / OR 独立换行</span></label><label class="formatter-option-check"><input id="sql-blank-lines" type="checkbox" checked /><span>语句之间空行</span></label><label class="formatter-option-check"><input id="sql-compact-operators" type="checkbox" /><span>运算符紧凑</span></label></div>
+    <div class="formatter-status" id="sql-format-status"><span class="formatter-status-dot"></span><span>等待输入</span><small>SQL · 本地格式化</small></div>
+    <div class="formatter-layout"><section class="workspace-card formatter-editor-card"><div class="workspace-card-head"><div><strong>SQL 输入</strong><small>支持查询、更新、CTE 和多条语句</small></div><span class="code-badge">SQL</span></div><textarea class="formatter-editor" id="sql-format-input" spellcheck="false" wrap="off" aria-label="SQL 输入">SELECT u.id,u.name,COUNT(o.id) AS order_count FROM users u LEFT JOIN orders o ON o.user_id=u.id WHERE u.status='active' AND o.created_at &gt;= '2026-01-01' GROUP BY u.id,u.name ORDER BY order_count DESC LIMIT 20;</textarea><div class="workspace-card-foot"><span id="sql-format-input-meta">0 个字符</span><span>不会执行 SQL</span></div></section><section class="workspace-card formatter-output-card"><div class="workspace-card-head"><div><strong>格式化结果</strong><small>关键字和子句自动分行</small></div><span class="code-badge">OUTPUT</span></div><pre class="formatter-output" id="sql-format-output" aria-live="polite"></pre><div class="workspace-card-foot"><span id="sql-format-output-meta">等待操作</span><button class="text-button" data-tool-action="sql-copy">复制</button></div></section></div>
   </div>`;
 }
 
@@ -1976,6 +2574,328 @@ function bindIpWorkspace() {
   render();
 }
 
+function messageQueueTargetMarkup(broker) {
+  if (broker === 'kafka') return `<div class="mq-target-grid"><label class="mq-field mq-field-wide"><span>Topic</span><input id="mq-topic" type="text" value="byetools.events" spellcheck="false" placeholder="输入 Kafka Topic" /></label><label class="mq-field"><span>Group ID</span><input id="mq-group" type="text" value="byetools-consumer" spellcheck="false" placeholder="可选" /></label><label class="mq-field"><span>Partition</span><input id="mq-partition" type="number" min="0" value="0" inputmode="numeric" placeholder="自动分配" /></label></div>`;
+  if (broker === 'rabbitmq') return `<div class="mq-target-grid"><label class="mq-field"><span>Exchange</span><input id="mq-exchange" type="text" value="byetools.exchange" spellcheck="false" placeholder="输入 Exchange" /></label><label class="mq-field"><span>Queue</span><input id="mq-queue" type="text" value="byetools.queue" spellcheck="false" placeholder="输入 Queue" /></label><label class="mq-field mq-field-wide"><span>Routing Key</span><input id="mq-routing-key" type="text" value="byetools.event" spellcheck="false" placeholder="输入 Routing Key" /></label></div>`;
+  if (broker === 'rocketmq') return `<div class="mq-target-grid"><label class="mq-field mq-field-wide"><span>Topic</span><input id="mq-topic" type="text" value="ByeToolsTopic" spellcheck="false" placeholder="输入 RocketMQ Topic" /></label><label class="mq-field"><span>Tag / 订阅表达式</span><input id="mq-tag" type="text" value="*" spellcheck="false" placeholder="*、TagA 或 TagA || TagB" /></label><label class="mq-field"><span>Consumer Group</span><input id="mq-group" type="text" value="byetools-consumer" spellcheck="false" placeholder="输入消费组" /></label></div>`;
+  return `<div class="mq-target-grid"><label class="mq-field mq-field-wide"><span>Topic</span><input id="mq-topic" type="text" value="byetools/demo" spellcheck="false" placeholder="输入 MQTT Topic" /></label><label class="mq-field"><span>QoS</span><select id="mq-qos" aria-label="MQTT 服务质量"><option value="0" data-icon="0" data-label="QoS 0" data-description="最多一次，不等待确认">QoS 0</option><option value="1" data-icon="1" data-label="QoS 1" data-description="至少一次，可能重复">QoS 1</option><option value="2" data-icon="2" data-label="QoS 2" data-description="恰好一次，完整确认">QoS 2</option></select></label><label class="mq-switch-field"><input id="mq-retain" type="checkbox" /><span><b>保留消息</b><small>让 Broker 保存最后一条消息</small></span></label></div>`;
+}
+
+function bindMessageQueueWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const broker = content.querySelector('#mq-broker');
+  const targetFields = content.querySelector('#mq-target-fields');
+  const targetCaption = content.querySelector('#mq-target-caption');
+  const targetBadge = content.querySelector('#mq-target-badge');
+  const message = content.querySelector('#mq-message');
+  const messageBadge = content.querySelector('#mq-message-badge');
+  const messageStatus = content.querySelector('#mq-message-status');
+  const connectionStatus = content.querySelector('#mq-connection-status');
+  const logBody = content.querySelector('#mq-log-body');
+  const configName = content.querySelector('#mq-config-name');
+  const configList = content.querySelector('#mq-config-list');
+  const addressLabel = content.querySelector('#mq-address-label');
+  const usernameLabel = content.querySelector('#mq-username-label');
+  const passwordLabel = content.querySelector('#mq-password-label');
+  const startButton = content.querySelector('[data-mq-action="consume-start"]');
+  const stopButton = content.querySelector('[data-mq-action="consume-stop"]');
+  let messageFormat = 'text';
+  let consuming = false;
+  let logs = [];
+  const desktopMq = Boolean(storage?.isDesktop && storage?.desktopInvoke);
+  let consumerSessionId = '';
+  let consumerConfig = null;
+  let unlistenMqEvent = null;
+
+  const brokerLabels = { mqtt: 'MQTT', kafka: 'Kafka', rabbitmq: 'RabbitMQ', rocketmq: 'RocketMQ' };
+  const brokerCaptions = { mqtt: ['MQTT Topic 与服务质量', 'TOPIC'], kafka: ['Kafka Topic、分区与消费组', 'TOPIC'], rabbitmq: ['RabbitMQ Exchange、Queue 与路由键', 'QUEUE'], rocketmq: ['RocketMQ 5.x Topic、Tag 与消费组', 'TOPIC'] };
+  const defaultPorts = { mqtt: '1883', kafka: '9092', rabbitmq: '5672', rocketmq: '8081' };
+  let previousBroker = broker.value;
+
+  const renderStatus = (title, detail, tone = '') => {
+    connectionStatus.className = `mq-status-panel${tone ? ` is-${tone}` : ''}`;
+    connectionStatus.innerHTML = `<span class="mq-status-dot"></span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div>`;
+  };
+
+  const desktopErrorMessage = (error, fallback) => {
+    if (typeof error === 'string') return error;
+    if (error?.message) return error.message;
+    return fallback;
+  };
+
+  const handleDesktopEvent = (event) => {
+    const payload = event?.payload || event;
+    if (!payload || payload.sessionId !== consumerSessionId) return;
+    const config = consumerConfig || collectConfig();
+    if (payload.event === 'message') {
+      const body = payload.body || '';
+      const summary = `${payload.target || targetSummary(config)} · ${body.replace(/\s+/g, ' ').slice(0, 72) || '(空消息)'}`;
+      addLog('消费', '已接收', config, summary, body);
+      renderStatus('消费中', `${payload.broker} 已收到消息：${payload.target || targetSummary(config)}`, 'success');
+      return;
+    }
+    if (payload.event === 'error') {
+      consuming = false;
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      addLog('消费', '失败', config, payload.detail || '消费者发生错误');
+      renderStatus('消费失败', payload.detail || '消费者发生错误', 'error');
+      showToast(payload.detail || '消费者发生错误');
+      return;
+    }
+    if (payload.event === 'stopped') {
+      consuming = false;
+      consumerSessionId = '';
+      consumerConfig = null;
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      renderStatus('消费已停止', payload.detail || '消费者已停止', 'pending');
+    }
+  };
+
+  const listenDesktopEvents = async () => {
+    const listen = globalThis.__TAURI__?.event?.listen;
+    if (!desktopMq || typeof listen !== 'function') return;
+    try {
+      unlistenMqEvent = await listen('mq://event', handleDesktopEvent);
+    } catch (error) {
+      showToast(`桌面事件监听失败：${desktopErrorMessage(error, '未知错误')}`);
+    }
+  };
+
+  const renderTargets = () => {
+    const current = broker.value;
+    targetFields.innerHTML = messageQueueTargetMarkup(current);
+    const caption = brokerCaptions[current] || brokerCaptions.mqtt;
+    targetCaption.textContent = caption[0];
+    targetBadge.textContent = caption[1];
+    enhanceBtSelects(targetFields);
+  };
+
+  const renderConnectionLabels = () => {
+    const rocketmq = broker.value === 'rocketmq';
+    addressLabel.textContent = rocketmq ? 'Proxy Endpoint' : 'Broker 地址';
+    usernameLabel.textContent = rocketmq ? 'AccessKey' : '用户名';
+    passwordLabel.textContent = rocketmq ? 'SecretKey' : '密码';
+    content.querySelector('#mq-address').placeholder = rocketmq ? '例如 rocketmq.example.com' : '例如 mq.example.com';
+  };
+
+  const collectConfig = () => {
+    const current = broker.value;
+    const fields = {
+      broker: current,
+      address: content.querySelector('#mq-address')?.value.trim() || '',
+      port: content.querySelector('#mq-port')?.value.trim() || '',
+      username: content.querySelector('#mq-username')?.value.trim() || '',
+      password: content.querySelector('#mq-password')?.value || '',
+      tls: Boolean(content.querySelector('#mq-tls')?.checked),
+    };
+    if (current === 'mqtt') Object.assign(fields, { topic: content.querySelector('#mq-topic')?.value.trim() || '', qos: content.querySelector('#mq-qos')?.value || '0', retain: Boolean(content.querySelector('#mq-retain')?.checked) });
+    if (current === 'kafka') Object.assign(fields, { topic: content.querySelector('#mq-topic')?.value.trim() || '', group: content.querySelector('#mq-group')?.value.trim() || '', partition: content.querySelector('#mq-partition')?.value.trim() || '' });
+    if (current === 'rabbitmq') Object.assign(fields, { exchange: content.querySelector('#mq-exchange')?.value.trim() || '', queue: content.querySelector('#mq-queue')?.value.trim() || '', routingKey: content.querySelector('#mq-routing-key')?.value.trim() || '' });
+    if (current === 'rocketmq') Object.assign(fields, { topic: content.querySelector('#mq-topic')?.value.trim() || '', tag: content.querySelector('#mq-tag')?.value.trim() || '*', group: content.querySelector('#mq-group')?.value.trim() || '' });
+    return fields;
+  };
+
+  const targetSummary = (config) => config.broker === 'rabbitmq' ? `${config.exchange || '(未填写)'} / ${config.queue || '(未填写)'}` : `${config.topic || '(未填写)'}${config.broker === 'kafka' && config.group ? ` · ${config.group}` : ''}${config.broker === 'rocketmq' ? ` · ${config.tag || '*'}${config.group ? ` · ${config.group}` : ''}` : ''}`;
+  const validateConfig = () => {
+    const config = collectConfig();
+    if (!config.address) return { config, error: '请先填写 Broker 地址' };
+    if (!config.port || Number(config.port) < 1 || Number(config.port) > 65535) return { config, error: '端口范围应为 1-65535' };
+    if (config.password && !config.username) return { config, error: '填写密码时必须同时填写用户名' };
+    if (config.broker === 'kafka' && (config.username || config.password)) return { config, error: '当前桌面版 Kafka 暂不支持 SASL 用户名密码认证' };
+    if (config.broker === 'rocketmq' && config.username && !config.password) return { config, error: 'RocketMQ 使用 AccessKey 时必须同时填写 SecretKey' };
+    const target = config.broker === 'rabbitmq' ? config.queue : config.topic;
+    if (!target) return { config, error: config.broker === 'rabbitmq' ? '请先填写 Queue' : '请先填写 Topic' };
+    if (config.broker === 'rocketmq' && !config.group) return { config, error: '请先填写 Consumer Group' };
+    return { config, error: '' };
+  };
+
+  const renderLogs = () => {
+    if (!logs.length) { logBody.innerHTML = '<tr class="mq-log-empty"><td colspan="5">暂无操作日志</td></tr>'; return; }
+    logBody.innerHTML = logs.map((item) => `<tr class="mq-log-row"><td>${escapeHtml(item.time)}</td><td><span class="mq-log-direction mq-log-direction-${item.direction === '发送' ? 'out' : item.direction === '消费' ? 'in' : 'connect'}">${escapeHtml(item.direction)}</span></td><td><span class="mq-log-state">${escapeHtml(item.status)}</span></td><td>${escapeHtml(item.broker)}</td><td title="${escapeHtml(item.summary)}">${escapeHtml(item.summary)}</td></tr>`).join('');
+  };
+
+  const persistConfigList = async () => {
+    const safeConfigs = state.messageQueue.configs.map(({ password, ...config }) => config);
+    try { await storage?.setSetting('mq-configs', safeConfigs); } catch (error) { showToast(`配置保存失败：${error.message}`); }
+  };
+
+  const renderConfigList = () => {
+    const configs = state.messageQueue.configs;
+    configList.innerHTML = configs.length ? configs.map((config) => `<div class="mq-config-item" data-mq-config-id="${escapeHtml(config.id)}"><div class="mq-config-item-copy"><strong>${escapeHtml(config.name)}</strong><small>${escapeHtml(brokerLabels[config.broker] || config.broker)} · ${escapeHtml(config.address)}:${escapeHtml(config.port)} · ${escapeHtml(targetSummary(config))}</small></div><div class="mq-config-item-actions"><button class="text-button" type="button" data-mq-config-action="apply" data-mq-config-id="${escapeHtml(config.id)}">应用</button><button class="text-button" type="button" data-mq-config-action="delete" data-mq-config-id="${escapeHtml(config.id)}">删除</button></div></div>`).join('') : '<div class="mq-config-empty">还没有保存的配置</div>';
+    configList.hidden = false;
+  };
+
+  const applyConfig = (config) => {
+    broker.value = config.broker || 'mqtt';
+    previousBroker = broker.value;
+    syncBtSelect(broker);
+    renderTargets();
+    renderConnectionLabels();
+    const setValue = (id, value) => { const field = content.querySelector(`#${id}`); if (!field) return; if (field.type === 'checkbox') field.checked = Boolean(value); else field.value = value ?? ''; if (field.tagName === 'SELECT') syncBtSelect(field); };
+    setValue('mq-address', config.address);
+    setValue('mq-port', config.port);
+    setValue('mq-username', config.username);
+    setValue('mq-password', config.password || '');
+    setValue('mq-tls', config.tls);
+    setValue('mq-topic', config.topic);
+    setValue('mq-qos', config.qos);
+    setValue('mq-retain', config.retain);
+    setValue('mq-group', config.group);
+    setValue('mq-tag', config.tag);
+    setValue('mq-partition', config.partition);
+    setValue('mq-exchange', config.exchange);
+    setValue('mq-queue', config.queue);
+    setValue('mq-routing-key', config.routingKey);
+    configName.value = config.name || '';
+    renderStatus('配置已应用', `${config.name} 已载入，${config.password ? '当前会话密码已恢复' : '密码未保存，请重新填写密码'}`, 'pending');
+    showToast(`已应用配置：${config.name}`);
+  };
+
+  const addLog = (direction, status, config, summary, body = '') => {
+    logs = [{ time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), direction, status, broker: brokerLabels[config.broker], summary, body }, ...logs].slice(0, 30);
+    renderLogs();
+  };
+
+  const updateMessageStatus = () => {
+    const value = message.value;
+    if (messageFormat === 'json') {
+      try { JSON.parse(value || 'null'); messageStatus.textContent = `JSON 格式有效 · ${value.length} 字符`; messageStatus.className = 'mq-message-status is-valid'; }
+      catch (error) { messageStatus.textContent = `JSON 格式有误 · ${error.message}`; messageStatus.className = 'mq-message-status is-error'; }
+    } else { messageStatus.textContent = `文本消息 · ${value.length} 字符`; messageStatus.className = 'mq-message-status'; }
+  };
+
+  const setMessageFormat = (format) => {
+    messageFormat = format;
+    content.querySelectorAll('[data-mq-format]').forEach((button) => { const active = button.dataset.mqFormat === format; button.classList.toggle('is-active', active); button.setAttribute('aria-pressed', String(active)); });
+    messageBadge.textContent = format === 'json' ? 'JSON' : 'TEXT';
+    message.placeholder = format === 'json' ? '{"event":"message","data":{}}' : '输入要发送的消息…';
+    updateMessageStatus();
+  };
+
+  const requestDesktop = async (action) => {
+    const checked = validateConfig();
+    if (checked.error) { renderStatus('配置不完整', checked.error, 'error'); showToast(checked.error); return null; }
+    const config = checked.config;
+    if (!desktopMq) {
+      if (action === 'test') { renderStatus('等待桌面端接入', `已校验 ${brokerLabels[config.broker]} 配置：${targetSummary(config)}，当前不会建立真实连接`, 'pending'); addLog('连接', '待桌面端', config, targetSummary(config)); showToast('真实 MQ 连接需要桌面端能力'); return config; }
+      if (action === 'send') { renderStatus('发送待桌面端接入', `消息已准备发送到 ${targetSummary(config)}，当前不会提交到 Broker`, 'pending'); addLog('发送', '待桌面端', config, `${targetSummary(config)} · ${message.value.trim().replace(/\s+/g, ' ').slice(0, 72) || '(空消息)'}`, message.value); showToast('发送功能将在桌面端接入'); return config; }
+      if (action === 'consume-start') { consuming = true; startButton.disabled = true; stopButton.disabled = false; renderStatus('消费待桌面端接入', `已准备监听 ${targetSummary(config)}，当前不会启动真实消费者`, 'pending'); addLog('消费', '待桌面端', config, `监听 ${targetSummary(config)}`, ''); showToast('消费功能将在桌面端接入'); return config; }
+      return config;
+    }
+    try {
+      if (action === 'test') {
+        renderStatus('正在测试连接', `正在连接 ${brokerLabels[config.broker]}：${targetSummary(config)}`, 'pending');
+        const result = await storage.desktopInvoke('mq_test_connection', { config });
+        renderStatus('连接成功', result?.detail || `已连接 ${targetSummary(config)}`, 'success');
+        addLog('连接', '已连接', config, result?.detail || targetSummary(config));
+        showToast('MQ 连接成功');
+        return config;
+      }
+      if (action === 'send') {
+        renderStatus('正在发送', `正在发送消息到 ${targetSummary(config)}`, 'pending');
+        const result = await storage.desktopInvoke('mq_send_message', { config, message: message.value });
+        renderStatus('发送成功', result?.detail || `消息已发送到 ${targetSummary(config)}`, 'success');
+        addLog('发送', '已发送', config, `${targetSummary(config)} · ${message.value.trim().replace(/\s+/g, ' ').slice(0, 72) || '(空消息)'}`, message.value);
+        showToast('消息已发送');
+        return config;
+      }
+      if (action === 'consume-start') {
+        if (consumerSessionId) await storage.desktopInvoke('mq_stop_consumer', { sessionId: consumerSessionId }).catch(() => {});
+        renderStatus('正在启动消费', `正在监听 ${targetSummary(config)}`, 'pending');
+        const result = await storage.desktopInvoke('mq_start_consumer', { config });
+        consumerSessionId = result?.sessionId || '';
+        consumerConfig = { ...config };
+        consuming = true;
+        startButton.disabled = true;
+        stopButton.disabled = !consumerSessionId;
+        renderStatus('消费中', result?.detail || `已开始监听 ${targetSummary(config)}`, 'success');
+        addLog('消费', '消费中', config, `监听 ${targetSummary(config)}`);
+        showToast('已开始消费');
+        return config;
+      }
+    } catch (error) {
+      const detail = desktopErrorMessage(error, '桌面端 MQ 操作失败');
+      renderStatus('操作失败', detail, 'error');
+      addLog(action === 'test' ? '连接' : action === 'send' ? '发送' : '消费', '失败', config, detail);
+      showToast(detail);
+    }
+    return config;
+  };
+
+  broker.addEventListener('change', () => {
+    const current = broker.value;
+    const portField = content.querySelector('#mq-port');
+    if (portField && (!portField.value || portField.value === defaultPorts[previousBroker])) portField.value = defaultPorts[current];
+    previousBroker = current;
+    renderTargets();
+    renderConnectionLabels();
+    renderStatus('等待操作', `已切换到 ${brokerLabels[current]}，请填写目标参数`);
+  });
+  message.addEventListener('input', updateMessageStatus);
+  content.querySelectorAll('[data-mq-format]').forEach((button) => button.addEventListener('click', () => setMessageFormat(button.dataset.mqFormat)));
+  content.querySelector('[data-mq-action="test"]').addEventListener('click', () => requestDesktop('test'));
+  content.querySelector('[data-mq-action="send"]').addEventListener('click', () => { if (messageFormat === 'json') { try { JSON.parse(message.value || 'null'); } catch (error) { updateMessageStatus(); showToast('请先修正 JSON 消息格式'); return; } } requestDesktop('send'); });
+  startButton.addEventListener('click', () => requestDesktop('consume-start'));
+  stopButton.addEventListener('click', async () => {
+    if (desktopMq && consumerSessionId) {
+      try { await storage.desktopInvoke('mq_stop_consumer', { sessionId: consumerSessionId }); } catch (error) { showToast(desktopErrorMessage(error, '停止消费者失败')); }
+      consumerSessionId = '';
+      consumerConfig = null;
+    }
+    consuming = false;
+    startButton.disabled = false;
+    stopButton.disabled = true;
+    renderStatus('消费已停止', desktopMq ? '已请求桌面端停止消费者' : '未建立真实 MQ 连接，仅停止本地消费状态', 'pending');
+  });
+  content.querySelector('[data-mq-action="format"]').addEventListener('click', () => { try { message.value = JSON.stringify(JSON.parse(message.value || 'null'), null, 2); setMessageFormat('json'); showToast('JSON 已格式化'); } catch (error) { setMessageFormat('json'); updateMessageStatus(); showToast('当前内容不是有效 JSON'); } });
+  content.querySelector('[data-mq-action="clear-message"]').addEventListener('click', () => { message.value = ''; updateMessageStatus(); message.focus(); });
+  content.querySelector('[data-mq-action="copy-message"]').addEventListener('click', () => copyText(message.value).then(() => showToast('消息内容已复制')));
+  content.querySelector('[data-mq-action="clear"]').addEventListener('click', () => { message.value = ''; setMessageFormat('text'); renderStatus('等待操作', '配置仍保留，消息内容已清空'); message.focus(); });
+  content.querySelector('[data-mq-action="clear-log"]').addEventListener('click', () => { logs = []; renderLogs(); showToast('消息日志已清空'); });
+  content.querySelector('[data-mq-action="export-consumed"]').addEventListener('click', () => {
+    const consumed = logs.filter((item) => item.direction === '消费');
+    if (!consumed.length) { showToast('暂无可导出的消费消息'); return; }
+    const rows = consumed.map((item) => [item.time, item.broker, item.status, item.summary, item.body || '']);
+    downloadExcelFile(['时间', '中间件', '状态', '目标', '消息内容'], rows, 'byetools-consumed-messages.xls', '消费消息 Excel 已导出');
+  });
+  content.querySelector('[data-mq-action="save-config"]').addEventListener('click', async () => {
+    const checked = validateConfig();
+    if (checked.error) { renderStatus('配置不完整', checked.error, 'error'); showToast(checked.error); return; }
+    const name = configName.value.trim();
+    if (!name) { showToast('请先填写配置名称'); configName.focus(); return; }
+    const record = { id: `mq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name, ...checked.config, savedAt: Date.now() };
+    state.messageQueue.configs = [record, ...state.messageQueue.configs.filter((item) => item.name !== name)].slice(0, 20);
+    await persistConfigList();
+    renderConfigList();
+    renderStatus('配置已保存', `${name} 已保存，可在配置列表中应用；密码不会持久化`, 'pending');
+    showToast('消息队列配置已保存');
+  });
+  content.querySelector('[data-mq-action="query-configs"]').addEventListener('click', () => { if (configList.hidden) renderConfigList(); else configList.hidden = true; });
+  configList.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-mq-config-action]');
+    if (!button) return;
+    const id = button.dataset.mqConfigId;
+    const config = state.messageQueue.configs.find((item) => item.id === id);
+    if (!config) return;
+    if (button.dataset.mqConfigAction === 'apply') applyConfig(config);
+    if (button.dataset.mqConfigAction === 'delete') { state.messageQueue.configs = state.messageQueue.configs.filter((item) => item.id !== id); await persistConfigList(); renderConfigList(); showToast(`已删除配置：${config.name}`); }
+  });
+  renderTargets();
+  renderConnectionLabels();
+  setMessageFormat('text');
+  renderLogs();
+  renderStatus('等待操作', desktopMq ? '桌面端会使用当前配置连接 Broker。' : 'Web 端不会建立真实 MQ 连接，请使用桌面客户端执行操作。');
+  listenDesktopEvents();
+  activeWorkspaceCleanup = () => {
+    if (typeof unlistenMqEvent === 'function') unlistenMqEvent();
+    if (desktopMq && consumerSessionId) storage.desktopInvoke('mq_stop_consumer', { sessionId: consumerSessionId }).catch(() => {});
+    consumerSessionId = '';
+    consumerConfig = null;
+  };
+}
+
 function shellTokens(value) {
   const tokens = [];
   const matcher = /"((?:\\.|[^"\\])*)"|'([^']*)'|([^\s]+)/g;
@@ -2081,6 +3001,299 @@ function bindHtmlWorkspace() {
   content.querySelector('[data-tool-action="html-clear"]').addEventListener('click', () => { input.value = ''; output.textContent = ''; caption.textContent = '等待操作'; status.textContent = '输入内容后选择转换方式'; status.className = ''; input.focus(); });
   content.querySelectorAll('[data-tool-action="html-copy"]').forEach((button) => button.addEventListener('click', () => copyText(output.textContent).then(() => showToast('转换结果已复制'))));
   execute('html-encode');
+}
+
+function setFormatterStatus(node, message, detail, type = '') {
+  if (!node) return;
+  node.className = `formatter-status${type ? ` is-${type}` : ''}`;
+  const main = node.querySelector('span:nth-child(2)');
+  const meta = node.querySelector('small');
+  if (main) main.textContent = message;
+  if (meta) meta.textContent = detail;
+}
+
+function formatterFullscreen(node) {
+  const target = node.closest('.formatter-workbench');
+  if (!target) return;
+  if (document.fullscreenElement) document.exitFullscreen?.();
+  else target.requestFullscreen?.();
+}
+
+function parseXmlDocument(source) {
+  const value = String(source || '').trim();
+  if (!value) throw new Error('请输入 XML 内容');
+  const documentNode = new DOMParser().parseFromString(value, 'application/xml');
+  const parserError = documentNode.querySelector('parsererror');
+  if (parserError) {
+    const detail = parserError.textContent.replace(/\s+/g, ' ').trim();
+    const line = detail.match(/line\s+(\d+)/i)?.[1];
+    throw new Error(`${line ? `第 ${line} 行：` : ''}${detail || 'XML 结构不合法'}`);
+  }
+  return documentNode;
+}
+
+function prettyXml(source) {
+  const documentNode = parseXmlDocument(source);
+  const serialized = new XMLSerializer().serializeToString(documentNode);
+  const compact = serialized.replace(/>\s+</g, '><').replace(/>\s*([^<\s][^<]*?)\s*</g, '>$1<');
+  const tokens = compact.replace(/(>)(<)(\/?)/g, '$1\n$2$3').split('\n').filter((line) => line.trim());
+  let depth = 0;
+  return tokens.map((token) => {
+    const line = token.trim();
+    if (/^<\//.test(line)) depth = Math.max(0, depth - 1);
+    const output = `${'  '.repeat(depth)}${line}`;
+    if (/^<[^!?/][^>]*[^/]?>$/.test(line) && !/<\/[^>]+>$/.test(line)) depth += 1;
+    return output;
+  }).join('\n');
+}
+
+function compactXml(source) {
+  const documentNode = parseXmlDocument(source);
+  return new XMLSerializer().serializeToString(documentNode).replace(/>\s+</g, '><').trim();
+}
+
+function xmlName(node, stripNamespace) {
+  const name = node.localName || node.nodeName;
+  return stripNamespace ? name.split(':').pop() : name;
+}
+
+function xmlElementValue(element, options) {
+  const children = [...element.children];
+  const attributes = options.ignoreAttributes ? [] : [...element.attributes];
+  const text = [...element.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE).map((node) => node.nodeValue.trim()).filter(Boolean).join(' ');
+  if (!children.length && !attributes.length) return text;
+  const result = {};
+  attributes.forEach((attribute) => { const key = `${options.attributePrefix}${xmlName(attribute, options.stripNamespace)}`; result[key] = attribute.value; });
+  if (text) result['#text'] = text;
+  children.forEach((child) => {
+    const key = xmlName(child, options.stripNamespace);
+    const value = xmlElementValue(child, options);
+    if (Object.prototype.hasOwnProperty.call(result, key)) result[key] = Array.isArray(result[key]) ? [...result[key], value] : [result[key], value];
+    else result[key] = options.forceArray ? [value] : value;
+  });
+  return result;
+}
+
+function xmlToObject(source, options) {
+  const documentNode = parseXmlDocument(source);
+  const root = documentNode.documentElement;
+  return { [xmlName(root, options.stripNamespace)]: xmlElementValue(root, options) };
+}
+
+function yamlScalar(value) {
+  if (value === null) return 'null';
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  const text = String(value);
+  return text && /^[A-Za-z0-9_./-]+$/.test(text) ? text : JSON.stringify(text);
+}
+
+function yamlKey(value) {
+  return /^[A-Za-z_][\w-]*$/.test(value) ? value : JSON.stringify(value);
+}
+
+function objectToYaml(value, indent = '  ', level = 0) {
+  const pad = indent.repeat(level);
+  if (Array.isArray(value)) {
+    if (!value.length) return `${pad}[]`;
+    return value.map((item) => {
+      if (item && typeof item === 'object') {
+        const nested = objectToYaml(item, indent, level + 1).split('\n');
+        return `${pad}- ${nested[0].trim()}${nested.length > 1 ? `\n${nested.slice(1).join('\n')}` : ''}`;
+      }
+      return `${pad}- ${yamlScalar(item)}`;
+    }).join('\n');
+  }
+  if (!value || typeof value !== 'object') return `${pad}${yamlScalar(value)}`;
+  const entries = Object.entries(value);
+  if (!entries.length) return `${pad}{}`;
+  return entries.map(([key, item]) => {
+    if (item && typeof item === 'object') return `${pad}${yamlKey(key)}:\n${objectToYaml(item, indent, level + 1)}`;
+    return `${pad}${yamlKey(key)}: ${yamlScalar(item)}`;
+  }).join('\n');
+}
+
+function javascriptValue(value, indent = '  ', level = 0) {
+  if (value === null) return 'null';
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value !== 'object') return String(value);
+  const pad = indent.repeat(level);
+  const childPad = indent.repeat(level + 1);
+  const entries = Array.isArray(value) ? value.map((item) => javascriptValue(item, indent, level + 1)) : Object.entries(value).map(([key, item]) => `${/^[A-Za-z_$][\w$]*$/.test(key) ? key : JSON.stringify(key)}: ${javascriptValue(item, indent, level + 1)}`);
+  if (!entries.length) return Array.isArray(value) ? '[]' : '{}';
+  return Array.isArray(value) ? `[\n${entries.map((item) => `${childPad}${item}`).join(',\n')}\n${pad}]` : `{\n${entries.map((item) => `${childPad}${item}`).join(',\n')}\n${pad}}`;
+}
+
+function phpValue(value, indent = '    ', level = 0) {
+  if (value === null) return 'null';
+  if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  if (typeof value !== 'object') return String(value);
+  const pad = indent.repeat(level);
+  const childPad = indent.repeat(level + 1);
+  const entries = Object.entries(value).map(([key, item]) => `${childPad}${Array.isArray(value) ? '' : `'${key.replace(/'/g, "\\'")}' => `}${phpValue(item, indent, level + 1)}`);
+  if (!entries.length) return '[]';
+  return `[\n${entries.join(',\n')}\n${pad}]`;
+}
+
+function objectToToml(value, indent = '  ') {
+  const lines = [];
+  const scalar = (item) => Array.isArray(item) ? `[${item.map((entry) => typeof entry === 'object' ? JSON.stringify(entry) : yamlScalar(entry)).join(', ')}]` : typeof item === 'string' ? JSON.stringify(item) : yamlScalar(item);
+  const visit = (node, path = []) => {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+    const entries = Object.entries(node);
+    const simple = entries.filter(([, item]) => !item || typeof item !== 'object' || Array.isArray(item));
+    if (path.length && simple.length) lines.push(`[${path.join('.')}]`);
+    simple.forEach(([key, item]) => lines.push(`${key} = ${scalar(item)}`));
+    entries.filter(([, item]) => item && typeof item === 'object' && !Array.isArray(item)).forEach(([key, item]) => visit(item, [...path, key]));
+  };
+  visit(value);
+  return lines.join('\n') || '# 空对象';
+}
+
+function xmlConverterOutput(value, format, indentSize) {
+  const indent = indentSize === 'tab' ? '\t' : ' '.repeat(Number(indentSize) || 2);
+  if (format === 'yaml') return objectToYaml(value, indent);
+  if (format === 'toml') return objectToToml(value, indent);
+  if (format === 'javascript') return `const data = ${javascriptValue(value, indent)};`;
+  if (format === 'php') return `<?php\n$data = ${phpValue(value, indent)};`;
+  return JSON.stringify(value, null, indent);
+}
+
+function bindXmlFormatWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const workbench = content.querySelector('.xml-format-workbench');
+  const input = content.querySelector('#xml-format-input');
+  const output = content.querySelector('#xml-format-output');
+  const status = content.querySelector('#xml-format-status');
+  const inputMeta = content.querySelector('#xml-format-input-meta');
+  const outputMeta = content.querySelector('#xml-format-output-meta');
+  const render = (action = 'format') => {
+    inputMeta.textContent = `${input.value.length} 个字符`;
+    try {
+      const result = action === 'minify' ? compactXml(input.value) : prettyXml(input.value);
+      output.textContent = result;
+      outputMeta.textContent = action === 'minify' ? '已压缩 XML' : '已格式化 XML';
+      setFormatterStatus(status, action === 'minify' ? '压缩完成' : '格式有效', `输出 ${result.length} 个字符`, 'success');
+    } catch (error) {
+      output.textContent = `XML 解析失败：${error.message}`;
+      outputMeta.textContent = '请检查标签和属性';
+      setFormatterStatus(status, 'XML 无效', error.message, 'error');
+    }
+  };
+  input.addEventListener('input', () => { inputMeta.textContent = `${input.value.length} 个字符`; setFormatterStatus(status, '等待操作', '输入变化后重新格式化'); });
+  content.querySelector('[data-tool-action="xml-format"]').addEventListener('click', () => render('format'));
+  content.querySelector('[data-tool-action="xml-minify"]').addEventListener('click', () => render('minify'));
+  content.querySelector('[data-tool-action="xml-sample"]').addEventListener('click', () => { input.value = '<catalog>\n  <book id="bk101"><title>ByeTools</title><author>ByeTools</author></book>\n</catalog>'; render('format'); });
+  content.querySelector('[data-tool-action="xml-clear"]').addEventListener('click', () => { input.value = ''; output.textContent = ''; inputMeta.textContent = '0 个字符'; outputMeta.textContent = '等待操作'; setFormatterStatus(status, '等待输入', 'XML · UTF-8'); input.focus(); });
+  content.querySelectorAll('[data-tool-action="xml-copy"]').forEach((button) => button.addEventListener('click', () => copyText(output.textContent).then(() => showToast('XML 结果已复制'))));
+  content.querySelector('[data-tool-action="xml-download"]').addEventListener('click', () => { if (!output.textContent) { showToast('请先格式化 XML'); return; } downloadTextFile(output.textContent, 'byetools-format.xml', 'application/xml;charset=utf-8'); showToast('XML 文件已下载'); });
+  content.querySelector('[data-tool-action="xml-fullscreen"]').addEventListener('click', () => formatterFullscreen(workbench));
+  content.querySelector('#xml-format-file').addEventListener('change', async (event) => { const file = event.target.files?.[0]; if (!file) return; input.value = await file.text(); render('format'); showToast(`已打开 ${file.name}`); event.target.value = ''; });
+  render('format');
+}
+
+function bindXmlConverterWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const workbench = content.querySelector('.xml-converter-workbench');
+  const input = content.querySelector('#xml-converter-input');
+  const output = content.querySelector('#xml-converter-output');
+  const status = content.querySelector('#xml-converter-status');
+  const format = content.querySelector('#xml-converter-format');
+  const formatLabels = { json: ['JSON 对象', 'JSON'], yaml: ['YAML 文档', 'YAML'], toml: ['TOML 文档', 'TOML'], javascript: ['JavaScript 对象', 'JS'], php: ['PHP 数组', 'PHP'] };
+  const render = () => {
+    const selected = formatLabels[format.value];
+    content.querySelector('#xml-converter-output-caption').textContent = selected[0];
+    content.querySelector('#xml-converter-output-badge').textContent = selected[1];
+    content.querySelector('#xml-converter-input-meta').textContent = `${input.value.length} 个字符`;
+    try {
+      const value = xmlToObject(input.value, { ignoreAttributes: content.querySelector('#xml-ignore-attributes').checked, stripNamespace: content.querySelector('#xml-strip-namespace').checked, forceArray: content.querySelector('#xml-force-array').checked, attributePrefix: content.querySelector('#xml-attribute-prefix').value || '@' });
+      const result = xmlConverterOutput(value, format.value, content.querySelector('#xml-converter-indent').value);
+      output.textContent = result;
+      content.querySelector('#xml-converter-output-meta').textContent = `已生成 ${result.length} 个字符`;
+      setFormatterStatus(status, '转换完成', `XML → ${selected[0]}`, 'success');
+    } catch (error) {
+      output.textContent = `转换失败：${error.message}`;
+      content.querySelector('#xml-converter-output-meta').textContent = '请检查 XML 内容';
+      setFormatterStatus(status, 'XML 无效', error.message, 'error');
+    }
+  };
+  [input, format, content.querySelector('#xml-ignore-attributes'), content.querySelector('#xml-strip-namespace'), content.querySelector('#xml-force-array'), content.querySelector('#xml-attribute-prefix'), content.querySelector('#xml-converter-indent')].forEach((node) => node.addEventListener('input', render));
+  format.addEventListener('change', render);
+  content.querySelector('[data-tool-action="xml-convert"]').addEventListener('click', render);
+  content.querySelector('[data-tool-action="xml-converter-sample"]').addEventListener('click', () => { input.value = '<user id="42">\n  <name>ByeTools</name>\n  <roles>developer</roles>\n  <roles>designer</roles>\n</user>'; render(); });
+  content.querySelector('[data-tool-action="xml-converter-clear"]').addEventListener('click', () => { input.value = ''; output.textContent = ''; content.querySelector('#xml-converter-input-meta').textContent = '0 个字符'; content.querySelector('#xml-converter-output-meta').textContent = '等待转换'; setFormatterStatus(status, '等待输入', `XML → ${formatLabels[format.value][0]}`); input.focus(); });
+  content.querySelectorAll('[data-tool-action="xml-converter-copy"]').forEach((button) => button.addEventListener('click', () => copyText(output.textContent).then(() => showToast('转换结果已复制'))));
+  content.querySelector('[data-tool-action="xml-converter-download"]').addEventListener('click', () => { if (!output.textContent) { showToast('请先转换 XML'); return; } const extension = { json: 'json', yaml: 'yaml', toml: 'toml', javascript: 'js', php: 'php' }[format.value]; downloadTextFile(output.textContent, `byetools-xml.${extension}`, 'text/plain;charset=utf-8'); showToast('转换文件已下载'); });
+  content.querySelector('[data-tool-action="xml-converter-fullscreen"]').addEventListener('click', () => formatterFullscreen(workbench));
+  content.querySelector('#xml-converter-file').addEventListener('change', async (event) => { const file = event.target.files?.[0]; if (!file) return; input.value = await file.text(); render(); showToast(`已打开 ${file.name}`); event.target.value = ''; });
+  render();
+}
+
+function protectSqlSegments(source) {
+  const segments = [];
+  const marker = (index) => `\uE100${index}\uE101`;
+  const pattern = /(--[^\r\n]*|\/\*[\s\S]*?\*\/|'(?:''|\\.|[^'])*'|"(?:""|\\.|[^"])*"|`(?:``|[^`])*`)/g;
+  const value = String(source || '').replace(pattern, (match) => { const index = segments.push(match) - 1; return marker(index); });
+  return { value, restore: (input) => input.replace(/\uE100(\d+)\uE101/g, (_, index) => segments[Number(index)] || '') };
+}
+
+function sqlKeywordCase(source, mode) {
+  if (mode === 'original') return source;
+  const words = ['SELECT', 'FROM', 'WHERE', 'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN', 'LEFT', 'RIGHT', 'FULL', 'INNER', 'OUTER', 'CROSS', 'ON', 'UNION', 'ALL', 'VALUES', 'SET', 'INSERT', 'INTO', 'UPDATE', 'DELETE', 'RETURNING', 'WITH', 'AS', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'NULL', 'IS', 'NOT', 'IN', 'EXISTS', 'CREATE', 'ALTER', 'DROP', 'TABLE', 'VIEW', 'INDEX'];
+  const pattern = new RegExp(`\\b(${words.join('|')})\\b`, 'gi');
+  return source.replace(pattern, (word) => mode === 'upper' ? word.toUpperCase() : word.toLowerCase());
+}
+
+function formatSql(source, options = {}) {
+  const protectedSource = protectSqlSegments(source);
+  let value = protectedSource.value.replace(/\s+/g, ' ').trim();
+  value = value.replace(/\s*([(),;])\s*/g, '$1');
+  value = value.replace(/\s*(=|<>|<=|>=|\+|-|\*|\/|%)\s*/g, options.compactOperators ? '$1' : ' $1 ');
+  value = value.replace(/\s*,\s*/g, ', ');
+  value = value.replace(/\)(?=[A-Za-z_])/g, ') ');
+  const clauses = ['LEFT OUTER JOIN', 'RIGHT OUTER JOIN', 'FULL OUTER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN', 'INNER JOIN', 'CROSS JOIN', 'GROUP BY', 'ORDER BY', 'UNION ALL', 'RETURNING', 'SELECT', 'FROM', 'WHERE', 'HAVING', 'LIMIT', 'OFFSET', 'VALUES', 'SET', 'JOIN', 'UNION'];
+  const clausePattern = new RegExp(`\\s+(${clauses.sort((a, b) => b.length - a.length).map((item) => item.replace(/ /g, '\\s+')).join('|')})\\b`, 'gi');
+  value = value.replace(clausePattern, '\n$1');
+  if (options.breakLogic) value = value.replace(/\s+(AND|OR)\s+/gi, '\n$1 ');
+  value = value.replace(/;\s*/g, ';\n');
+  const indent = options.indent === 'tab' ? '\t' : ' '.repeat(Number(options.indent) || 2);
+  const lines = value.split('\n').map((line) => line.trim()).filter(Boolean).map((line, index) => index === 0 || /^(SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|UNION)/i.test(line) ? line : `${indent}${line}`);
+  let result = sqlKeywordCase(lines.join('\n'), options.keywordCase || 'upper');
+  if (options.blankLines) result = result.replace(/;\n(?=\S)/g, ';\n\n');
+  return protectedSource.restore(result).trim();
+}
+
+function minifySql(source, options = {}) {
+  const protectedSource = protectSqlSegments(source);
+  let value = protectedSource.value.replace(/\s+/g, ' ').trim().replace(/\s*([(),;])\s*/g, '$1');
+  if (options.compactOperators) value = value.replace(/\s*(=|<>|<=|>=|\+|-|\*|\/|%)\s*/g, '$1');
+  return protectedSource.restore(sqlKeywordCase(value, options.keywordCase || 'upper'));
+}
+
+function bindSqlFormatWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const workbench = content.querySelector('.sql-format-workbench');
+  const input = content.querySelector('#sql-format-input');
+  const output = content.querySelector('#sql-format-output');
+  const status = content.querySelector('#sql-format-status');
+  const readOptions = () => ({ keywordCase: content.querySelector('#sql-keyword-case').value, indent: content.querySelector('#sql-indent').value, breakLogic: content.querySelector('#sql-break-logic').checked, blankLines: content.querySelector('#sql-blank-lines').checked, compactOperators: content.querySelector('#sql-compact-operators').checked });
+  const render = (action = 'format') => {
+    content.querySelector('#sql-format-input-meta').textContent = `${input.value.length} 个字符`;
+    const options = readOptions();
+    const result = action === 'minify' ? minifySql(input.value, options) : formatSql(input.value, options);
+    output.textContent = result;
+    content.querySelector('#sql-format-output-meta').textContent = `${action === 'minify' ? '已压缩' : '已格式化'} · ${result.length} 个字符`;
+    setFormatterStatus(status, action === 'minify' ? '压缩完成' : '格式化完成', `${result.split('\n').length} 行 · ${content.querySelector('#sql-dialect').value}`, 'success');
+  };
+  input.addEventListener('input', () => { content.querySelector('#sql-format-input-meta').textContent = `${input.value.length} 个字符`; setFormatterStatus(status, '等待操作', '修改选项后点击格式化'); });
+  content.querySelector('[data-tool-action="sql-format"]').addEventListener('click', () => render('format'));
+  content.querySelector('[data-tool-action="sql-minify"]').addEventListener('click', () => render('minify'));
+  content.querySelector('[data-tool-action="sql-sample"]').addEventListener('click', () => { input.value = 'WITH active_users AS (SELECT id,name FROM users WHERE status = \'active\') SELECT u.name,COUNT(o.id) AS orders FROM active_users u LEFT JOIN orders o ON o.user_id = u.id GROUP BY u.name HAVING COUNT(o.id) > 0 ORDER BY orders DESC;'; render('format'); });
+  content.querySelector('[data-tool-action="sql-clear"]').addEventListener('click', () => { input.value = ''; output.textContent = ''; content.querySelector('#sql-format-input-meta').textContent = '0 个字符'; content.querySelector('#sql-format-output-meta').textContent = '等待操作'; setFormatterStatus(status, '等待输入', 'SQL · 本地格式化'); input.focus(); });
+  content.querySelectorAll('[data-tool-action="sql-copy"]').forEach((button) => button.addEventListener('click', () => copyText(output.textContent).then(() => showToast('SQL 结果已复制'))));
+  content.querySelector('[data-tool-action="sql-download"]').addEventListener('click', () => { if (!output.textContent) { showToast('请先格式化 SQL'); return; } downloadTextFile(output.textContent, 'byetools-format.sql', 'text/plain;charset=utf-8'); showToast('SQL 文件已下载'); });
+  content.querySelector('[data-tool-action="sql-fullscreen"]').addEventListener('click', () => formatterFullscreen(workbench));
+  ['#sql-dialect', '#sql-keyword-case', '#sql-indent', '#sql-break-logic', '#sql-blank-lines', '#sql-compact-operators'].forEach((selector) => content.querySelector(selector).addEventListener('change', () => render('format')));
+  render('format');
 }
 
 const mindmapTemplatePresets = {
@@ -3970,6 +5183,18 @@ function downloadCsv(headers, rows, name, message) {
   if (message) showToast(message);
 }
 
+function excelXmlEscape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character]);
+}
+
+function downloadExcelFile(headers, rows, name, message) {
+  const headerRow = `<Row ss:StyleID="Header">${headers.map((value) => `<Cell><Data ss:Type="String">${excelXmlEscape(value)}</Data></Cell>`).join('')}</Row>`;
+  const bodyRows = rows.map((row) => `<Row>${row.map((value) => `<Cell><Data ss:Type="String">${excelXmlEscape(value)}</Data></Cell>`).join('')}</Row>`).join('');
+  const workbook = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Header"><Font ss:Bold="1" /></Style></Styles><Worksheet ss:Name="消费消息"><Table>${headerRow}${bodyRows}</Table></Worksheet></Workbook>`;
+  downloadTextFile(`\ufeff${workbook}`, name, 'application/vnd.ms-excel;charset=utf-8');
+  if (message) showToast(message);
+}
+
 function cronParseParts(expression) {
   const tokens = expression.trim().split(/\s+/).filter(Boolean);
   if (tokens.length === 5) return ['0', ...tokens, '-'];
@@ -4262,6 +5487,7 @@ function cryptoModeOptions(tool) {
     sm4: [['CBC', 'SM4-CBC'], ['ECB', 'SM4-ECB'], ['CTR', 'SM4-CTR'], ['CFB', 'SM4-CFB'], ['OFB', 'SM4-OFB']],
     des: [['CBC', 'DES-CBC'], ['ECB', 'DES-ECB']],
     '3des': [['CBC', '3DES-CBC'], ['ECB', '3DES-ECB']],
+    rsa: [['RSA-OAEP', 'RSA-OAEP'], ['RSAES-PKCS1-v1_5', 'RSAES-PKCS#1 v1.5']],
   };
   return (options[tool.id] || []).map(([value, label], index) => `<option value="${value}" ${index === 0 ? 'selected' : ''}>${label}</option>`).join('');
 }
@@ -4282,6 +5508,7 @@ function cryptoModeHint(tool, mode) {
     sm4: { ECB: ['无需 IV', '分组模式', 'PKCS#7'], CBC: ['IV', '16 字节', 'PKCS#7'], CTR: ['计数器', '16 字节', 'NoPadding'], CFB: ['IV', '16 字节', 'NoPadding'], OFB: ['IV', '16 字节', 'NoPadding'] },
     des: { ECB: ['无需 IV', '分组模式', 'PKCS#5 / PKCS#7'], CBC: ['IV', '8 字节', 'PKCS#5 / PKCS#7'] },
     '3des': { ECB: ['无需 IV', '分组模式', 'PKCS#5 / PKCS#7'], CBC: ['IV', '8 字节', 'PKCS#5 / PKCS#7'] },
+    rsa: { 'RSA-OAEP': ['无需 IV', '公钥加密 / 私钥解密', '由 RSA 算法处理'], 'RSAES-PKCS1-v1_5': ['无需 IV', '兼容旧系统', 'PKCS#1 v1.5'] },
   };
   return hints[tool.id]?.[mode] || ['IV / Nonce', '按算法规范填写', '按算法规范填写'];
 }
@@ -4289,6 +5516,8 @@ function cryptoModeHint(tool, mode) {
 function cryptoModeCapability(tool, mode) {
   if (tool.id === 'aes' && ['GCM', 'CBC', 'CTR'].includes(mode)) return 'ready';
   if (tool.id === 'sm4' && ['CBC', 'ECB'].includes(mode)) return 'ready';
+  if (tool.id === '3des' && ['CBC', 'ECB'].includes(mode)) return 'ready';
+  if (tool.id === 'rsa' && ['RSA-OAEP', 'RSAES-PKCS1-v1_5'].includes(mode)) return 'ready';
   return tool.capability === 'deprecated' ? 'deprecated' : 'library';
 }
 
@@ -4314,7 +5543,8 @@ function cryptoAlgorithmDescription(tool) {
     sm4: '国密对称加密',
     aes: 'AES-GCM / CBC / CTR 加密',
     des: '单密钥分组加密 · 不推荐',
-    '3des': '三重 DES 分组加密 · 不推荐',
+    '3des': '三重 DES 分组加密 · 仅兼容旧系统',
+    rsa: 'RSA-OAEP / PKCS#1 v1.5 非对称加密',
   };
   return descriptions[tool.id] || tool.description;
 }
@@ -4336,6 +5566,8 @@ const btSelectIconDefinitions = {
   'clean-newline': ['↵', 'icon-regex'],
   'line-operation': ['☷', 'icon-regex'],
   'curl-language': ['↯', 'icon-random'],
+  'mq-broker': ['MQ', 'icon-message-queue'],
+  'mq-qos': ['Q', 'icon-message-queue'],
   'markdown-theme': ['M', 'icon-html'],
   'markdown-size': ['Aa', 'icon-html'],
   'random-type': ['⌁', 'icon-random'],
@@ -4377,6 +5609,8 @@ const btSelectDescriptionDefinitions = {
   'clean-newline': { lf: 'Unix / Linux 换行格式', crlf: 'Windows 换行格式' },
   'line-operation': { dedupe: '删除重复的文本行', 'sort-asc': '按字典顺序升序排列', 'sort-desc': '按字典顺序降序排列', reverse: '反转当前行顺序', number: '为每行添加序号', 'remove-empty': '删除空白行', filter: '保留匹配筛选内容的行' },
   'curl-language': { fetch: '生成浏览器 Fetch 代码', axios: '生成 Axios 请求代码', python: '生成 Python Requests 代码', go: '生成 Go net/http 代码' },
+  'mq-broker': { mqtt: '轻量发布与订阅协议', kafka: '主题生产与消费平台', rabbitmq: '交换机与队列消息服务', rocketmq: 'RocketMQ 5.x Proxy 消息服务' },
+  'mq-qos': { 0: '最多一次，不等待确认', 1: '至少一次，可能重复', 2: '恰好一次，完整确认' },
   'markdown-theme': { midnight: '深色背景的分享主题', paper: '浅色纸张风格主题', mint: '清新的薄荷绿色主题' },
   'markdown-size': { 16: '适合紧凑内容排版', 18: '适合常规分享排版', 20: '适合较大屏幕阅读', 24: '适合标题和演示排版' },
   'random-type': { integer: '生成安全随机整数', decimal: '生成安全随机小数', boolean: '生成随机布尔值', uuid: '生成 UUID v4 标识符', hex: '生成十六进制令牌', base64: '生成 Base64 令牌', string: '按字符集生成随机字符串', color: '生成随机颜色值', date: '生成随机日期时间', ip: '生成随机 IPv4 地址', binary: '生成随机二进制内容' },
@@ -4604,25 +5838,27 @@ function cryptoAlgorithmPickerMarkup(selectedId) {
 function cryptoWorkbenchMarkup(tool) {
   const isDigest = tool.cryptoType === 'digest';
   const isAsymmetric = tool.cryptoType === 'asymmetric';
+  const isRsa = tool.id === 'rsa';
   const isAes = tool.id === 'aes';
-  const initialMode = isDigest || isAsymmetric ? '' : cryptoModeOptions(tool).match(/value="([^"]+)"/)?.[1] || 'CBC';
+  const initialMode = isDigest || (isAsymmetric && !isRsa) ? '' : cryptoModeOptions(tool).match(/value="([^"]+)"/)?.[1] || 'CBC';
   const modeHint = initialMode ? cryptoModeHint(tool, initialMode) : ['IV / Nonce', '按算法规范填写', '按算法规范填写'];
   const initialModeCapability = initialMode ? cryptoModeCapability(tool, initialMode) : '';
-  const modeMarkup = isDigest || isAsymmetric ? '' : `<label class="crypto-field"><span>加密模式</span><select id="crypto-mode">${cryptoModeOptions(tool)}</select></label>`;
-  const modeCapabilityMarkup = isDigest || isAsymmetric ? '' : `<span class="crypto-mode-capability crypto-mode-capability-${initialModeCapability}" id="crypto-mode-capability"><i></i>${cryptoModeCapabilityLabel(initialModeCapability)}</span>`;
-  const symmetricKeyHint = tool.id === 'aes' ? '16 / 24 / 32 字节（128 / 192 / 256 bit）' : tool.id === 'sm4' ? '固定 16 字节（128 bit）' : tool.id === 'des' ? '固定 8 字节（64 bit）' : '16 或 24 字节（128 或 192 bit）';
+  const modeMarkup = isDigest || (isAsymmetric && !isRsa) ? '' : `<label class="crypto-field"><span>${isRsa ? 'RSA 加密方案' : '加密模式'}</span><select id="crypto-mode">${cryptoModeOptions(tool)}</select></label>`;
+  const modeCapabilityMarkup = isDigest || (isAsymmetric && !isRsa) ? '' : `<span class="crypto-mode-capability crypto-mode-capability-${initialModeCapability}" id="crypto-mode-capability"><i></i>${cryptoModeCapabilityLabel(initialModeCapability)}</span>`;
+  const symmetricKeyHint = tool.id === 'aes' ? '16 / 24 / 32 字节（128 / 192 / 256 bit）' : tool.id === 'sm4' ? '固定 16 字节（128 bit）' : tool.id === 'des' ? '固定 8 字节（64 bit）' : tool.id === '3des' ? '固定 24 字节（192 bit）' : '16 或 24 字节（128 或 192 bit）';
   const sm4EncodingOptions = '<option value="utf8" selected>UTF-8</option><option value="hex">Hex</option><option value="base64">Base64</option>';
   const sm4KeyMarkup = `<div class="crypto-field crypto-key-field crypto-secret-field" data-crypto-secret="key"><div class="crypto-secret-head"><label class="crypto-secret-label" for="crypto-key"><span>密钥 <small>KEY</small></span></label><span class="crypto-secret-length" id="crypto-key-length" data-crypto-length="key">需 16 字节</span><label class="crypto-secret-encoding"><span class="sr-only">密钥编码</span><select id="crypto-key-encoding" aria-label="密钥编码">${sm4EncodingOptions}</select></label><button class="secondary-button crypto-random-button" type="button" data-crypto-random="key" title="随机生成 16 字节密钥">随机</button></div><input id="crypto-key" type="text" spellcheck="false" autocomplete="off" placeholder="输入 UTF-8 原文密钥…" /></div>`;
   const sm4IvMarkup = `<div class="crypto-field crypto-secret-field" id="crypto-iv-field" data-crypto-secret="iv"><div class="crypto-secret-head"><label class="crypto-secret-label" for="crypto-iv"><span><b id="crypto-iv-label">偏移量 IV</b> <small id="crypto-iv-hint">${modeHint[1]}</small></span></label><span class="crypto-secret-length" id="crypto-iv-length" data-crypto-length="iv">需 16 字节</span><label class="crypto-secret-encoding"><span class="sr-only">IV 编码</span><select id="crypto-iv-encoding" aria-label="IV 编码">${sm4EncodingOptions}</select></label><button class="secondary-button crypto-random-button" type="button" data-crypto-random="iv" title="随机生成 16 字节 IV">随机</button></div><input id="crypto-iv" type="text" spellcheck="false" autocomplete="off" placeholder="输入 UTF-8 原文 IV…" value="" /></div>`;
   const sm2KeyMarkup = `<section class="crypto-sm2-key-panel crypto-key-field" data-sm2-key-panel><div class="crypto-sm2-panel-head"><div class="crypto-sm2-panel-title"><strong>SM2 密钥对</strong><span>Hex</span></div><div class="crypto-sm2-key-actions"><button class="secondary-button" type="button" data-sm2-key-action="derive">由私钥推导公钥</button><button class="primary-button" type="button" data-sm2-key-action="generate">生成密钥对</button></div></div><div class="crypto-sm2-key-grid"><div class="crypto-sm2-key-field"><div class="crypto-sm2-key-field-head"><label for="crypto-key">公钥 <small>04 + X + Y，130 位</small></label><button class="secondary-button" type="button" data-sm2-key-action="copy-public">复制</button></div><textarea id="crypto-key" spellcheck="false" autocomplete="off" placeholder="输入 04 开头的公钥…"></textarea><span class="crypto-sm2-key-status" id="crypto-sm2-public-status">等待输入</span></div><div class="crypto-sm2-key-field"><div class="crypto-sm2-key-field-head"><label for="crypto-private-key">私钥 <small>64 位</small></label><button class="secondary-button" type="button" data-sm2-key-action="copy-private">复制</button></div><textarea id="crypto-private-key" spellcheck="false" autocomplete="off" placeholder="输入 64 位私钥…"></textarea><span class="crypto-sm2-key-status" id="crypto-sm2-private-status">等待输入</span></div></div></section>`;
   const sm2CompatibilityMarkup = `<section class="crypto-sm2-compatibility"><div class="crypto-sm2-compatibility-grid"><label class="crypto-field"><span>密文排列</span><select id="sm2-cipher-mode"><option value="1" selected>C1C3C2 · 现行国标</option><option value="0">C1C2C3 · 兼容旧系统</option></select></label><div class="crypto-sm2-compatibility-options"><strong>兼容选项</strong><label><input id="sm2-cipher-prefix" type="checkbox" />密文加 04 前缀</label><label><input id="sm2-cipher-der" type="checkbox" />ASN.1 DER 密文</label></div></div><div class="crypto-sm2-compatibility-note">解密时 <b>04 前缀</b>会自动识别，带不带都能解；若报错，多半是“密文排列”选反了，对调 C1C3C2 / C1C2C3 再试。</div></section>`;
-  const keyMarkup = !isDigest ? tool.id === 'sm4' ? sm4KeyMarkup : tool.id === 'sm2' ? sm2KeyMarkup : `<label class="crypto-field crypto-key-field"><span>${isAsymmetric ? 'Hex 密钥' : '密钥'} <small>${isAsymmetric ? '公钥 130 位或私钥 64 位 Hex' : symmetricKeyHint}</small></span><input id="crypto-key" type="text" spellcheck="false" autocomplete="off" placeholder="${isAsymmetric ? '输入 04 开头的公钥或 64 位私钥…' : '输入原文密钥…'}" value="${isAes ? 'ByeToolsKey12345' : ''}" /></label>` : '';
+  const rsaKeyMarkup = `<section class="crypto-rsa-key-panel crypto-key-field" data-rsa-key-panel><div class="crypto-rsa-panel-head"><div class="crypto-rsa-panel-title"><strong>RSA 密钥对</strong><span>PEM / 2048 bit</span></div><div class="crypto-rsa-key-actions"><button class="secondary-button" type="button" data-rsa-key-action="copy-public">复制公钥</button><button class="secondary-button" type="button" data-rsa-key-action="copy-private">复制私钥</button><button class="primary-button" type="button" data-rsa-key-action="generate">生成密钥对</button></div></div><div class="crypto-rsa-key-grid"><div class="crypto-rsa-key-field"><div class="crypto-rsa-key-field-head"><label for="crypto-rsa-public-key">公钥 <small>SPKI PEM · 用于加密</small></label><span id="crypto-rsa-public-status">等待生成</span></div><textarea id="crypto-rsa-public-key" spellcheck="false" autocomplete="off" placeholder="点击“生成密钥对”，或粘贴 -----BEGIN PUBLIC KEY----- …"></textarea></div><div class="crypto-rsa-key-field"><div class="crypto-rsa-key-field-head"><label for="crypto-rsa-private-key">私钥 <small>PKCS#8 PEM · 用于解密</small></label><span id="crypto-rsa-private-status">等待生成</span></div><textarea id="crypto-rsa-private-key" spellcheck="false" autocomplete="off" placeholder="点击“生成密钥对”，或粘贴 -----BEGIN PRIVATE KEY----- …"></textarea></div></div></section>`;
+  const keyMarkup = !isDigest ? tool.id === 'sm4' ? sm4KeyMarkup : tool.id === 'sm2' ? sm2KeyMarkup : isRsa ? rsaKeyMarkup : `<label class="crypto-field crypto-key-field"><span>${isAsymmetric ? 'Hex 密钥' : '密钥'} <small>${isAsymmetric ? '公钥 130 位或私钥 64 位 Hex' : symmetricKeyHint}</small></span><input id="crypto-key" type="text" spellcheck="false" autocomplete="off" placeholder="${isAsymmetric ? '输入 04 开头的公钥或 64 位私钥…' : '输入原文密钥…'}" value="${isAes ? 'ByeToolsKey12345' : ''}" /></label>` : '';
   const ivMarkup = !isDigest && !isAsymmetric ? tool.id === 'sm4' ? sm4IvMarkup : `<label class="crypto-field" id="crypto-iv-field"><span><b id="crypto-iv-label">${modeHint[0]}</b> <small id="crypto-iv-hint">${modeHint[1]}</small></span><input id="crypto-iv" type="text" spellcheck="false" autocomplete="off" placeholder="输入原文 ${modeHint[0]}…" value="${isAes ? 'ByeToolsIV12' : ''}" /></label>` : '';
   const paddingMarkup = !isDigest && !isAsymmetric ? `<label class="crypto-field"><span>填充方式</span><select id="crypto-padding">${cryptoPaddingOptions(tool, initialMode)}</select></label>` : '';
   const ctrLengthMarkup = tool.id === 'aes' ? '<label class="crypto-field crypto-ctr-length-field" id="crypto-ctr-length-field" hidden><span>计数器长度</span><select id="crypto-ctr-length"><option value="64" selected>64 bit</option><option value="32">32 bit</option><option value="128">128 bit</option></select></label>' : '';
   const gcmTagMarkup = tool.id === 'aes' ? '<label class="crypto-field crypto-gcm-tag-field" id="crypto-gcm-tag-field" hidden><span>认证标签</span><select id="crypto-gcm-tag-length"><option value="128" selected>128 bit</option><option value="120">120 bit</option><option value="112">112 bit</option><option value="104">104 bit</option><option value="96">96 bit</option><option value="64">64 bit</option><option value="32">32 bit</option></select></label>' : '';
   const keyLengthMarkup = isAes ? '<label class="crypto-field"><span>密钥长度</span><select id="crypto-key-length"><option value="128">128 bit</option><option value="192">192 bit</option><option value="256">256 bit</option></select></label>' : '';
-  const variantMarkup = isDigest ? `<label class="crypto-field"><span>摘要算法</span><select id="crypto-variant">${cryptoDigestOptions(tool)}</select></label>` : '';
+  const variantMarkup = isDigest ? `<label class="crypto-field"><span>摘要算法</span><select id="crypto-variant">${cryptoDigestOptions(tool)}</select></label>` : isRsa ? '<label class="crypto-field"><span>RSA 哈希算法</span><select id="crypto-rsa-hash"><option value="SHA-256" selected>SHA-256</option><option value="SHA-384">SHA-384</option><option value="SHA-512">SHA-512</option></select></label>' : '';
   const statusText = tool.capabilityLabel;
   const note = tool.capability === 'ready'
     ? `${tool.name} 可在当前浏览器本地执行，结果不会上传。`
@@ -4832,13 +6068,14 @@ function isWorkspaceConfigControl(node) {
   if (node.disabled || node.closest('[hidden]')) return false;
   if (node.dataset.cronMode || node.dataset.cronInput || node.dataset.cronSpecific) return false;
   if (node.tagName === 'SELECT') return true;
+  if (node.tagName === 'TEXTAREA') return configTextFieldIds.has(node.id);
   if (node.tagName !== 'INPUT') return false;
   if (['number', 'range', 'checkbox', 'radio', 'color', 'date', 'datetime-local', 'time'].includes(node.type)) return true;
   return configTextFieldIds.has(node.id) || Boolean(node.dataset.gradientIndex != null || node.dataset.shadowIndex != null || node.dataset.cronInput || node.dataset.cronSpecific || node.dataset.cronMode);
 }
 
 function getWorkspaceConfigControls(content) {
-  return [...content.querySelectorAll('input, select')].filter(isWorkspaceConfigControl);
+  return [...content.querySelectorAll('input, select, textarea')].filter(isWorkspaceConfigControl);
 }
 
 function readWorkspaceControlValue(node) {
@@ -4889,6 +6126,8 @@ const cryptoConfigFieldLabels = {
   'crypto-key-length': '密钥长度',
   'crypto-key': '密钥',
   'crypto-private-key': 'SM2 私钥',
+  'crypto-rsa-public-key': 'RSA 公钥',
+  'crypto-rsa-private-key': 'RSA 私钥',
   'crypto-key-encoding': '密钥编码',
   'crypto-iv': 'IV / Nonce',
   'crypto-iv-encoding': 'IV 编码',
@@ -4905,7 +6144,7 @@ function collectCryptoConfigPayload(tool, content) {
   const fields = getWorkspaceConfigControls(content)
     .map((node) => {
       const key = configControlKey(node);
-      const sensitive = key === 'crypto-key' || key === 'crypto-private-key' || key === 'crypto-iv';
+      const sensitive = ['crypto-key', 'crypto-private-key', 'crypto-rsa-public-key', 'crypto-rsa-private-key', 'crypto-iv'].includes(key);
       const type = node.tagName === 'SELECT' ? 'select' : sensitive ? 'secret' : node.type === 'number' ? 'number' : node.type === 'checkbox' || node.type === 'radio' ? 'boolean' : 'text';
       return { key, type, value: readWorkspaceControlValue(node), sensitive, required: Boolean(node.required) };
     })
@@ -4927,7 +6166,7 @@ function maskCryptoConfigValue(value) {
 
 function cryptoConfigReadableValue(key, value, mask = false, payload = null) {
   if (key === 'crypto-algorithm') return getTool(value)?.name || value || '未设置';
-  if (key === 'crypto-key' || key === 'crypto-private-key' || key === 'crypto-iv') return mask ? maskCryptoConfigValue(value) : value || '未设置';
+  if (['crypto-key', 'crypto-private-key', 'crypto-rsa-public-key', 'crypto-rsa-private-key', 'crypto-iv'].includes(key)) return mask ? maskCryptoConfigValue(value) : value || '未设置';
   if (key === 'crypto-mode' && value) {
     const algorithm = cryptoConfigFieldValue(payload, 'crypto-algorithm');
     const prefix = algorithm === 'aes' ? 'AES' : algorithm === 'sm4' ? 'SM4' : algorithm === '3des' ? '3DES' : algorithm === 'des' ? 'DES' : '';
@@ -4943,12 +6182,12 @@ function cryptoConfigReadableValue(key, value, mask = false, payload = null) {
 }
 
 function cryptoConfigSummaryMarkup(payload, mask = false) {
-  const rows = ['crypto-algorithm', 'crypto-variant', 'crypto-mode', 'crypto-key-length', 'crypto-key', 'crypto-private-key', 'crypto-key-encoding', 'crypto-iv', 'crypto-iv-encoding', 'crypto-padding', 'crypto-ctr-length', 'crypto-gcm-tag-length', 'sm2-cipher-mode', 'sm2-cipher-prefix', 'sm2-cipher-der', 'crypto-format']
+  const rows = ['crypto-algorithm', 'crypto-variant', 'crypto-mode', 'crypto-key-length', 'crypto-key', 'crypto-private-key', 'crypto-rsa-public-key', 'crypto-rsa-private-key', 'crypto-key-encoding', 'crypto-iv', 'crypto-iv-encoding', 'crypto-padding', 'crypto-ctr-length', 'crypto-gcm-tag-length', 'sm2-cipher-mode', 'sm2-cipher-prefix', 'sm2-cipher-der', 'crypto-format']
     .map((key) => {
       const value = cryptoConfigFieldValue(payload, key);
       if (value === '' || value == null) return '';
       const label = payload?.toolId === 'sm2' && key === 'crypto-key' ? 'SM2 公钥' : cryptoConfigFieldLabels[key];
-      return `<div class="crypto-config-summary-row"><span>${label}</span><code class="${key === 'crypto-key' || key === 'crypto-private-key' || key === 'crypto-iv' ? 'is-secret' : ''}">${escapeHtml(cryptoConfigReadableValue(key, value, mask, payload))}</code></div>`;
+      return `<div class="crypto-config-summary-row"><span>${label}</span><code class="${['crypto-key', 'crypto-private-key', 'crypto-rsa-public-key', 'crypto-rsa-private-key', 'crypto-iv'].includes(key) ? 'is-secret' : ''}">${escapeHtml(cryptoConfigReadableValue(key, value, mask, payload))}</code></div>`;
     })
     .filter(Boolean)
     .join('');
@@ -4958,7 +6197,7 @@ function cryptoConfigSummaryMarkup(payload, mask = false) {
 }
 
 function cryptoConfigHasSecret(payload) {
-  return ['crypto-key', 'crypto-private-key', 'crypto-iv'].some((key) => payload?.fields?.some((field) => field.key === key && field.value));
+  return ['crypto-key', 'crypto-private-key', 'crypto-rsa-public-key', 'crypto-rsa-private-key', 'crypto-iv'].some((key) => payload?.fields?.some((field) => field.key === key && field.value));
 }
 
 function cryptoConfigDate(value) {
@@ -5022,7 +6261,7 @@ async function openCryptoConfigSaveModal(tool, content) {
   const modal = document.createElement('div');
   modal.className = 'crypto-config-modal';
   modal.dataset.cryptoConfigModal = 'save';
-  const secretHint = cryptoConfigHasSecret(payload) ? tool.id === 'sm2' ? 'SM2 公钥和私钥会随配置正文加密保存' : '密钥与 IV 会随配置正文加密保存' : '只保存当前摘要或加密参数，不保存正文和结果';
+  const secretHint = cryptoConfigHasSecret(payload) ? tool.id === 'sm2' ? 'SM2 公钥和私钥会随配置正文加密保存' : tool.id === 'rsa' ? 'RSA 公钥和私钥会随配置正文加密保存' : '密钥与 IV 会随配置正文加密保存' : '只保存当前摘要或加密参数，不保存正文和结果';
   const storageHint = storage?.isDesktop ? '桌面版使用 SQLCipher、系统凭证与 AES-256-GCM 加密保存。' : 'Web 版使用本机 IndexedDB 与 AES-GCM 加密保存。';
   modal.innerHTML = `<div class="crypto-config-backdrop" data-crypto-config-close></div><section class="crypto-config-dialog" role="dialog" aria-modal="true" aria-labelledby="crypto-config-dialog-title"><div class="crypto-config-dialog-head"><div><p class="eyebrow">${editingRecord ? 'EDIT CONFIGURATION' : 'SAVE CONFIGURATION'}</p><h2 id="crypto-config-dialog-title">${editingRecord ? '编辑加密配置' : '保存加密配置'}</h2><p>保存当前${escapeHtml(tool.name)}的算法参数，正文和结果不会进入配置。</p></div><button class="icon-button" type="button" data-crypto-config-close aria-label="关闭">×</button></div><label class="crypto-config-name-field"><span>配置名称</span><input id="crypto-config-name" type="text" maxlength="40" autocomplete="off" placeholder="例如：生产接口 AES-GCM" value="${escapeHtml(editingRecord?.name || '')}" /></label><div class="crypto-config-dialog-section"><div class="crypto-config-section-head"><strong>将保存的参数</strong><span>${secretHint}</span></div>${cryptoConfigSummaryMarkup(payload, false)}</div><div class="crypto-config-dialog-note"><span>${storageHint}</span></div><div class="crypto-config-dialog-actions"><button class="secondary-button" type="button" data-crypto-config-close>取消</button><button class="primary-button" type="button" data-crypto-config-modal-action="save">${editingRecord ? '更新配置' : '保存配置'}</button></div></section>`;
   document.body.appendChild(modal);
@@ -5058,7 +6297,7 @@ async function openCryptoConfigHistoryModal(tool, content) {
   const modal = document.createElement('div');
   modal.className = 'crypto-config-modal';
   modal.dataset.cryptoConfigModal = 'history';
-  const historyHint = records.some((record) => cryptoConfigHasSecret(record.payload)) ? `仅显示当前加密工具的配置，${tool.id === 'sm2' ? '公钥和私钥' : '密钥和 IV'} 在列表中以掩码展示。` : '仅显示当前加密工具的配置，列表只展示算法参数。';
+  const historyHint = records.some((record) => cryptoConfigHasSecret(record.payload)) ? `仅显示当前加密工具的配置，${tool.id === 'sm2' || tool.id === 'rsa' ? '公钥和私钥' : '密钥和 IV'} 在列表中以掩码展示。` : '仅显示当前加密工具的配置，列表只展示算法参数。';
   modal.innerHTML = `<div class="crypto-config-backdrop" data-crypto-config-close></div><section class="crypto-config-dialog crypto-config-history-dialog" role="dialog" aria-modal="true" aria-labelledby="crypto-config-history-title"><div class="crypto-config-dialog-head"><div><p class="eyebrow">CONFIGURATION HISTORY</p><h2 id="crypto-config-history-title">${escapeHtml(tool.name)}配置历史</h2><p>${historyHint}</p></div><button class="icon-button" type="button" data-crypto-config-close aria-label="关闭">×</button></div>${cryptoConfigHistoryListMarkup(records)}<div class="crypto-config-dialog-note"><span>配置加密保存在当前设备，并按工具隔离展示。</span></div></section>`;
   document.body.appendChild(modal);
   modal.addEventListener('click', async (event) => {
@@ -5121,7 +6360,9 @@ function setValueAtPath(value, path, nextValue) {
 
 function persist() {
   if (!storage) return;
-  storage.setRecentTools(state.history.slice(0, 12)).catch((error) => showToast(`历史保存失败：${error.message}`));
+  const validHistory = state.history.filter((id) => tools.some((tool) => tool.id === id)).slice(0, 12);
+  state.history = validHistory;
+  storage.setRecentTools(validHistory).catch((error) => showToast(`历史保存失败：${error.message}`));
 }
 
 function persistJsonPreferences() {
@@ -5319,6 +6560,82 @@ function normalizeSm2PrivateKey(value) {
   const normalized = String(value ?? '').replace(/\s+/g, '').replace(/^0x/i, '').toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(normalized)) throw new Error('SM2 私钥应为 64 位十六进制内容');
   return normalized.toLowerCase();
+}
+
+function bytesToPem(bytes, label) {
+  const base64 = bytesToBase64(bytes);
+  const lines = base64.match(/.{1,64}/g) || [];
+  return `-----BEGIN ${label}-----\n${lines.join('\n')}\n-----END ${label}-----`;
+}
+
+function pemToBytes(value, label) {
+  const text = String(value ?? '').trim();
+  if (!text) throw new Error(`请输入 RSA ${label}`);
+  const match = text.match(/-----BEGIN [^-]+-----([\s\S]+?)-----END [^-]+-----/);
+  const base64 = (match ? match[1] : text).replace(/\s+/g, '');
+  return base64ToBytes(base64);
+}
+
+function readDerElement(bytes, offset = 0) {
+  const tag = bytes[offset];
+  const lengthByte = bytes[offset + 1];
+  if (tag === undefined || lengthByte === undefined) throw new Error('RSA 私钥格式不完整');
+  let length;
+  let headerLength = 2;
+  if (lengthByte & 0x80) {
+    const lengthBytes = lengthByte & 0x7f;
+    if (!lengthBytes || lengthBytes > 4 || offset + 2 + lengthBytes > bytes.length) throw new Error('RSA 私钥长度字段无效');
+    length = 0;
+    for (let index = 0; index < lengthBytes; index += 1) length = (length << 8) | bytes[offset + 2 + index];
+    headerLength += lengthBytes;
+  } else {
+    length = lengthByte;
+  }
+  const valueStart = offset + headerLength;
+  const end = valueStart + length;
+  if (end > bytes.length) throw new Error('RSA 私钥内容不完整');
+  return { tag, valueStart, end };
+}
+
+function rsaPkcs8ToPkcs1Pem(value) {
+  const text = String(value ?? '').trim();
+  if (/-----BEGIN RSA PRIVATE KEY-----/.test(text)) return text;
+  const bytes = pemToBytes(value, '私钥');
+  const outer = readDerElement(bytes);
+  if (outer.tag !== 0x30) throw new Error('RSA 私钥不是 PKCS#8 格式');
+  let offset = outer.valueStart;
+  const version = readDerElement(bytes, offset);
+  offset = version.end;
+  const algorithm = readDerElement(bytes, offset);
+  offset = algorithm.end;
+  const privateKey = readDerElement(bytes, offset);
+  if (privateKey.tag !== 0x04) throw new Error('RSA 私钥内容无效');
+  return bytesToPem(bytes.slice(privateKey.valueStart, privateKey.end), 'RSA PRIVATE KEY');
+}
+
+function rsaPkcs1ToPkcs8Pem(value) {
+  const bytes = pemToBytes(value, '私钥');
+  const algorithm = [0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00];
+  const body = [0x02, 0x01, 0x00, ...algorithm, 0x04, ...sm2DerLengthBytes(bytes.length), ...bytes];
+  return bytesToPem(Uint8Array.from([0x30, ...sm2DerLengthBytes(body.length), ...body]), 'PRIVATE KEY');
+}
+
+function cryptoWordArrayToBytes(wordArray) {
+  const bytes = new Uint8Array(wordArray.sigBytes);
+  for (let index = 0; index < wordArray.sigBytes; index += 1) bytes[index] = (wordArray.words[index >>> 2] >>> (24 - (index % 4) * 8)) & 0xff;
+  return bytes;
+}
+
+function cryptoBytesToWordArray(bytes) {
+  return CryptoJS.lib.WordArray.create(bytes);
+}
+
+function rsaCryptoAlgorithm(mode, hash) {
+  return mode === 'RSA-OAEP' ? { name: mode, hash } : { name: mode };
+}
+
+function rsaKeyGenerationAlgorithm(mode, hash) {
+  return { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: hash || 'SHA-256' };
 }
 
 function sm2DerLengthBytes(length) {
@@ -5575,6 +6892,69 @@ function bindCryptoWorkspace(tool) {
     output.textContent = new TextDecoder().decode(plainBytes);
     setStatus(`已完成 · ${plainBytes.length} 字节`, 'success');
   };
+  const execute3Des = async () => {
+    const mode = content.querySelector('#crypto-mode').value;
+    if (!['CBC', 'ECB'].includes(mode)) throw new Error(`3DES-${mode} 暂不支持，请使用 CBC 或 ECB 模式`);
+    const keyBytes = cryptoSecretBytes(content.querySelector('#crypto-key').value, '3DES 密钥', [24]);
+    const paddingValue = content.querySelector('#crypto-padding').value;
+    const ivInput = content.querySelector('#crypto-iv');
+    const iv = mode === 'CBC' ? cryptoBytesToWordArray(cryptoSecretBytes(ivInput.value, '3DES-CBC 的 IV', [8])) : undefined;
+    const options = { mode: mode === 'CBC' ? CryptoJS.mode.CBC : CryptoJS.mode.ECB, padding: paddingValue === 'NONE' ? CryptoJS.pad.NoPadding : CryptoJS.pad.Pkcs7 };
+    if (iv) options.iv = iv;
+    const key = cryptoBytesToWordArray(keyBytes);
+    if (activeOperation === 'encrypt') {
+      const plainBytes = new TextEncoder().encode(input.value);
+      if (paddingValue === 'NONE' && plainBytes.length % 8 !== 0) throw new Error('3DES NoPadding 要求明文长度为 8 字节的整数倍');
+      const encrypted = CryptoJS.TripleDES.encrypt(cryptoBytesToWordArray(plainBytes), key, options);
+      const cipherBytes = cryptoWordArrayToBytes(encrypted.ciphertext);
+      output.textContent = formatCryptoBytes(cipherBytes, format.value);
+      setStatus(`已完成 · ${cipherBytes.length} 字节`, 'success');
+      return;
+    }
+    const cipherBytes = parseCryptoBytes(input.value, format.value);
+    if (!cipherBytes.length || cipherBytes.length % 8 !== 0) throw new Error('3DES 密文长度应为 8 字节的整数倍');
+    const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext: cryptoBytesToWordArray(cipherBytes) });
+    const plainBytes = cryptoWordArrayToBytes(CryptoJS.TripleDES.decrypt(cipherParams, key, options));
+    output.textContent = new TextDecoder().decode(plainBytes);
+    setStatus(`已完成 · ${plainBytes.length} 字节`, 'success');
+  };
+  const executeRsa = async () => {
+    const mode = content.querySelector('#crypto-mode').value;
+    const hash = content.querySelector('#crypto-rsa-hash')?.value || 'SHA-256';
+    if (mode === 'RSAES-PKCS1-v1_5') {
+      const cipherText = activeOperation === 'decrypt' ? formatCryptoBytes(parseCryptoBytes(input.value, format.value), 'base64') : '';
+      const rsa = new JSEncrypt({ default_key_size: 2048, log: false });
+      let result;
+      if (activeOperation === 'encrypt') {
+        rsa.setPublicKey(content.querySelector('#crypto-rsa-public-key').value.trim());
+        result = rsa.encrypt(input.value);
+        if (!result) throw new Error('RSAES-PKCS1-v1_5 明文过长或公钥格式不正确');
+        const resultBytes = parseCryptoBytes(result, 'base64');
+        output.textContent = formatCryptoBytes(resultBytes, format.value);
+        setStatus(`已完成 · ${resultBytes.length} 字节`, 'success');
+        return;
+      }
+      rsa.setPrivateKey(rsaPkcs8ToPkcs1Pem(content.querySelector('#crypto-rsa-private-key').value.trim()));
+      result = rsa.decrypt(cipherText);
+      if (result === false || result == null) throw new Error('RSAES-PKCS1-v1_5 解密失败，请确认私钥和密文匹配');
+      const resultBytes = new TextEncoder().encode(result);
+      output.textContent = result;
+      setStatus(`已完成 · ${resultBytes.length} 字节`, 'success');
+      return;
+    }
+    const algorithm = rsaCryptoAlgorithm(mode, hash);
+    if (activeOperation === 'encrypt') {
+      const publicKey = await window.crypto.subtle.importKey('spki', pemToBytes(content.querySelector('#crypto-rsa-public-key').value, '公钥'), algorithm, false, ['encrypt']);
+      const cipherBytes = new Uint8Array(await window.crypto.subtle.encrypt(algorithm, publicKey, new TextEncoder().encode(input.value)));
+      output.textContent = formatCryptoBytes(cipherBytes, format.value);
+      setStatus(`已完成 · ${cipherBytes.length} 字节`, 'success');
+      return;
+    }
+    const privateKey = await window.crypto.subtle.importKey('pkcs8', pemToBytes(content.querySelector('#crypto-rsa-private-key').value, '私钥'), algorithm, false, ['decrypt']);
+    const plainBytes = new Uint8Array(await window.crypto.subtle.decrypt(algorithm, privateKey, parseCryptoBytes(input.value, format.value)));
+    output.textContent = new TextDecoder().decode(plainBytes);
+    setStatus(`已完成 · ${plainBytes.length} 字节`, 'success');
+  };
   const executeAes = async () => {
     const mode = content.querySelector('#crypto-mode').value;
     if (!['GCM', 'CBC', 'CTR'].includes(mode)) throw new Error(`AES-${mode} 当前需要接入密码库`);
@@ -5603,6 +6983,8 @@ function bindCryptoWorkspace(tool) {
       else if (tool.id === 'sm3') await executeSm3();
       else if (tool.id === 'sm2') await executeSm2();
       else if (tool.id === 'sm4') await executeSm4();
+      else if (tool.id === '3des') await execute3Des();
+      else if (tool.id === 'rsa') await executeRsa();
       else if (tool.id === 'aes') await executeAes();
       else renderUnavailable();
     } catch (error) {
@@ -5752,6 +7134,56 @@ function bindCryptoWorkspace(tool) {
       setStatus(`已生成随机${kind === 'key' ? '密钥' : 'IV'}`, 'success');
     }));
   }
+  if (tool.id === 'rsa') {
+    const publicKeyInput = content.querySelector('#crypto-rsa-public-key');
+    const privateKeyInput = content.querySelector('#crypto-rsa-private-key');
+    const publicStatus = content.querySelector('#crypto-rsa-public-status');
+    const privateStatus = content.querySelector('#crypto-rsa-private-status');
+    const syncRsaKeyState = () => {
+      const publicValue = publicKeyInput?.value.trim() || '';
+      const privateValue = privateKeyInput?.value.trim() || '';
+      if (publicStatus) publicStatus.textContent = publicValue ? '已填写' : '等待生成';
+      if (privateStatus) privateStatus.textContent = privateValue ? '已填写' : '等待生成';
+    };
+    const generateRsaKeyPair = async () => {
+      const mode = content.querySelector('#crypto-mode').value;
+      const hash = content.querySelector('#crypto-rsa-hash')?.value || 'SHA-256';
+      if (mode === 'RSAES-PKCS1-v1_5') {
+        const rsa = new JSEncrypt({ default_key_size: 2048, log: false });
+        await new Promise((resolve, reject) => {
+          try { rsa.getKey(resolve); } catch (error) { reject(error); }
+        });
+        publicKeyInput.value = rsa.getPublicKey();
+        privateKeyInput.value = rsaPkcs1ToPkcs8Pem(rsa.getPrivateKey());
+        publicKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        privateKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+        syncRsaKeyState();
+        setStatus('已生成 RSA 密钥对', 'success');
+        return;
+      }
+      const pair = await window.crypto.subtle.generateKey(rsaKeyGenerationAlgorithm(mode, hash), true, ['encrypt', 'decrypt']);
+      const [publicBytes, privateBytes] = await Promise.all([window.crypto.subtle.exportKey('spki', pair.publicKey), window.crypto.subtle.exportKey('pkcs8', pair.privateKey)]);
+      publicKeyInput.value = bytesToPem(new Uint8Array(publicBytes), 'PUBLIC KEY');
+      privateKeyInput.value = bytesToPem(new Uint8Array(privateBytes), 'PRIVATE KEY');
+      publicKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      privateKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      syncRsaKeyState();
+      setStatus('已生成 RSA 密钥对', 'success');
+    };
+    publicKeyInput?.addEventListener('input', syncRsaKeyState);
+    privateKeyInput?.addEventListener('input', syncRsaKeyState);
+    content.querySelectorAll('[data-rsa-key-action]').forEach((button) => button.addEventListener('click', async () => {
+      const action = button.dataset.rsaKeyAction;
+      if (action === 'generate') {
+        try { await generateRsaKeyPair(); } catch (error) { setStatus(`密钥生成失败：${error.message}`, 'error'); }
+        return;
+      }
+      const source = action === 'copy-public' ? publicKeyInput : privateKeyInput;
+      if (!source?.value.trim()) { showToast(`请先输入${action === 'copy-public' ? '公钥' : '私钥'}`); return; }
+      copyText(source.value.trim()).then(() => showToast(`${action === 'copy-public' ? '公钥' : '私钥'}已复制`));
+    }));
+    syncRsaKeyState();
+  }
   content.querySelectorAll('[data-tool-action]').forEach((button) => button.addEventListener('click', () => {
     if (button.dataset.toolAction === 'crypto-clear') { input.value = ''; output.textContent = ''; setStatus('等待执行'); return; }
     if (button.dataset.toolAction === 'copy-crypto-output') { copyText(output.textContent || '').then(() => showToast('结果已复制')); return; }
@@ -5774,8 +7206,223 @@ function bindCryptoWorkspace(tool) {
   };
 }
 
+function linuxCommandWorkbenchMarkup() {
+  return `<div class="linux-command-workbench" id="linux-command-workbench">
+    <div class="linux-command-toolbar">
+      <label class="linux-command-search" for="linux-command-search">
+        <span class="linux-command-search-icon" aria-hidden="true">⌕</span>
+        <input id="linux-command-search" type="search" autocomplete="off" spellcheck="false" placeholder="搜索命令、用途或关键词，例如 grep、端口、权限…" />
+        <kbd>/</kbd>
+      </label>
+      <div class="linux-command-count" aria-live="polite"><strong id="linux-command-count">0</strong><span>条匹配命令</span></div>
+    </div>
+    <div class="linux-command-layout">
+      <aside class="linux-command-categories" aria-label="Linux 命令分类">
+        <div class="linux-command-panel-head"><strong>命令分类</strong><span>按场景浏览</span></div>
+        <div class="linux-command-category-list" id="linux-command-categories"><span class="linux-command-loading">正在加载分类…</span></div>
+      </aside>
+      <section class="linux-command-results" aria-label="Linux 命令列表">
+        <div class="linux-command-panel-head"><strong id="linux-command-result-title">全部命令</strong><span id="linux-command-result-meta">正在加载</span></div>
+        <div class="linux-command-list" id="linux-command-list" role="listbox" aria-label="匹配的 Linux 命令"><span class="linux-command-loading">正在载入命令资料…</span></div>
+      </section>
+      <section class="linux-command-detail" id="linux-command-detail" aria-label="命令详情" aria-live="polite">
+        <div class="linux-command-detail-empty"><span>&gt;_</span><strong>正在准备命令详情</strong><p>命令资料仅在当前设备加载。</p></div>
+      </section>
+    </div>
+  </div>`;
+}
+
+async function bindLinuxCommandWorkspace() {
+  const content = refs.workspace.querySelector('#workspace-content');
+  const workbench = content.querySelector('#linux-command-workbench');
+  if (!workbench) return;
+  const searchInput = workbench.querySelector('#linux-command-search');
+  const categoryList = workbench.querySelector('#linux-command-categories');
+  const commandList = workbench.querySelector('#linux-command-list');
+  const detail = workbench.querySelector('#linux-command-detail');
+  const resultTitle = workbench.querySelector('#linux-command-result-title');
+  const resultMeta = workbench.querySelector('#linux-command-result-meta');
+  const count = workbench.querySelector('#linux-command-count');
+  const commandModule = await import('./linux-commands.data.js');
+  if (!workbench.isConnected || state.currentTool?.id !== 'linux-commands') return;
+
+  const categories = commandModule.linuxCommandCategories;
+  const commands = commandModule.linuxCommands;
+  const commandByName = new Map(commands.map((command) => [command.name, command]));
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const searchIndex = new Map(commands.map((command) => [command.name, [
+    command.name,
+    command.summary,
+    command.syntax,
+    command.description,
+    categoryById.get(command.category)?.label || '',
+    ...(command.tags || []),
+    ...(command.related || []),
+    ...(command.options || []).flat(),
+    ...(command.examples || []).flatMap((example) => [example.command, example.description]),
+  ].join(' ').toLocaleLowerCase('zh-CN')]));
+  const riskLabels = {
+    safe: { label: '安全', title: '常规命令', fallback: '该命令通常用于只读查询或低风险操作，仍建议在执行前确认参数和目标。' },
+    caution: { label: '注意', title: '谨慎操作', fallback: '该命令可能修改文件或系统状态，执行前请核对参数、路径和影响范围。' },
+    danger: { label: '高风险', title: '危险操作', fallback: '该命令可能造成服务中断或数据丢失，必须确认环境、权限和恢复方案。' },
+  };
+  let activeCategory = 'all';
+  let activeCommand = 'ls';
+  let query = '';
+  let visibleCommands = [];
+  const getVisibleCommands = () => {
+    const tokens = query.toLocaleLowerCase('zh-CN').split(/\s+/).filter(Boolean);
+    return commands
+      .filter((command) => activeCategory === 'all' || command.category === activeCategory)
+      .filter((command) => tokens.every((token) => searchIndex.get(command.name).includes(token)))
+      .sort((left, right) => {
+        if (!tokens.length) return left.name.localeCompare(right.name, 'en');
+        const leftName = left.name.toLowerCase();
+        const rightName = right.name.toLowerCase();
+        const rank = (name) => tokens.reduce((score, token) => score + (name === token ? 0 : name.startsWith(token) ? 1 : name.includes(token) ? 2 : 4), 0);
+        return rank(leftName) - rank(rightName) || left.name.localeCompare(right.name, 'en');
+      });
+  };
+  const renderCategories = () => {
+    categoryList.innerHTML = categories.map((category) => {
+      const categoryCount = category.id === 'all' ? commands.length : commands.filter((command) => command.category === category.id).length;
+      return `<button class="linux-command-category ${category.id === activeCategory ? 'is-active' : ''}" type="button" data-linux-category="${category.id}" aria-pressed="${category.id === activeCategory}">
+        <span class="linux-command-category-icon">${escapeHtml(category.icon)}</span>
+        <span class="linux-command-category-copy"><strong>${escapeHtml(category.label)}</strong><small>${escapeHtml(category.description)}</small></span>
+        <span class="linux-command-category-count">${categoryCount}</span>
+      </button>`;
+    }).join('');
+  };
+  const renderCommandList = () => {
+    const category = categoryById.get(activeCategory) || categories[0];
+    resultTitle.textContent = query ? `“${query}” 的结果` : category.label;
+    resultMeta.textContent = `${visibleCommands.length} / ${activeCategory === 'all' ? commands.length : commands.filter((command) => command.category === activeCategory).length}`;
+    count.textContent = String(visibleCommands.length);
+    if (!visibleCommands.length) {
+      commandList.innerHTML = `<div class="linux-command-empty"><span>⌕</span><strong>没有找到匹配命令</strong><p>尝试命令名、用途或中文关键词。</p><button class="secondary-button compact" type="button" data-linux-action="clear-search">清空搜索</button></div>`;
+      return;
+    }
+    commandList.innerHTML = visibleCommands.map((command) => `<button class="linux-command-item ${command.name === activeCommand ? 'is-active' : ''}" type="button" role="option" aria-selected="${command.name === activeCommand}" data-linux-command="${escapeHtml(command.name)}">
+      <span class="linux-command-item-main"><code>${escapeHtml(command.name)}</code><span>${escapeHtml(command.summary)}</span></span>
+      <span class="linux-command-item-risk is-${command.risk}">${riskLabels[command.risk]?.label || '注意'}</span>
+    </button>`).join('');
+  };
+  const renderDetail = () => {
+    const command = commandByName.get(activeCommand);
+    if (!command || !visibleCommands.some((item) => item.name === command.name)) {
+      detail.innerHTML = `<div class="linux-command-detail-empty"><span>⌕</span><strong>没有可显示的命令</strong><p>调整分类或搜索条件后查看命令详情。</p></div>`;
+      return;
+    }
+    const category = categoryById.get(command.category);
+    const risk = riskLabels[command.risk] || riskLabels.caution;
+    const optionsMarkup = command.options?.length
+      ? `<div class="linux-command-section"><div class="linux-command-section-title"><strong>常用参数</strong><span>${command.options.length} 项</span></div><div class="linux-command-option-list">${command.options.map(([option, description]) => `<div class="linux-command-option"><code>${escapeHtml(option)}</code><span>${escapeHtml(description)}</span></div>`).join('')}</div></div>`
+      : '';
+    const examplesMarkup = command.examples?.length
+      ? `<div class="linux-command-section"><div class="linux-command-section-title"><strong>使用示例</strong><span>点击复制后在终端中确认再执行</span></div><div class="linux-command-example-list">${command.examples.map((example) => `<div class="linux-command-example"><div><span>${escapeHtml(example.description)}</span><button type="button" data-linux-copy="${escapeHtml(example.command)}" title="复制命令示例">复制</button></div><code>${escapeHtml(example.command)}</code></div>`).join('')}</div></div>`
+      : '';
+    const relatedMarkup = command.related?.length
+      ? `<div class="linux-command-section"><div class="linux-command-section-title"><strong>相关命令</strong><span>继续查阅</span></div><div class="linux-command-related">${command.related.map((name) => `<button type="button" data-linux-related="${escapeHtml(name)}" ${commandByName.has(name) ? '' : 'disabled'}>${escapeHtml(name)}</button>`).join('')}</div></div>`
+      : '';
+    detail.innerHTML = `<div class="linux-command-detail-head">
+      <div class="linux-command-detail-heading"><span class="linux-command-prompt" aria-hidden="true">$</span><div><div class="linux-command-detail-meta"><span>${escapeHtml(category?.label || '')}</span><span class="linux-command-risk-badge is-${command.risk}">${risk.label}</span></div><h2>${escapeHtml(command.name)}</h2><p>${escapeHtml(command.summary)}</p></div></div>
+      <div class="linux-command-tags">${(command.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('')}</div>
+    </div>
+    <div class="linux-command-section linux-command-overview">
+      <div class="linux-command-syntax-head"><strong>基础语法</strong><button type="button" data-linux-copy="${escapeHtml(command.syntax)}" title="复制基础语法">复制语法</button></div>
+      <code class="linux-command-syntax">${escapeHtml(command.syntax)}</code>
+      <p>${escapeHtml(command.description)}</p>
+    </div>
+    <div class="linux-command-risk-note is-${command.risk}"><span>${risk.label === '安全' ? '✓' : risk.label === '注意' ? '!' : '!!'}</span><div><strong>${risk.title}</strong><p>${escapeHtml(command.riskNote || risk.fallback)}</p></div></div>
+    ${optionsMarkup}${examplesMarkup}${relatedMarkup}`;
+  };
+  const render = () => {
+    visibleCommands = getVisibleCommands();
+    if (!visibleCommands.some((command) => command.name === activeCommand)) activeCommand = visibleCommands[0]?.name || '';
+    renderCategories();
+    renderCommandList();
+    renderDetail();
+  };
+  const selectCommandByOffset = (offset) => {
+    if (!visibleCommands.length) return;
+    const currentIndex = Math.max(0, visibleCommands.findIndex((command) => command.name === activeCommand));
+    activeCommand = visibleCommands[Math.min(visibleCommands.length - 1, Math.max(0, currentIndex + offset))].name;
+    renderCommandList();
+    renderDetail();
+    requestAnimationFrame(() => commandList.querySelector(`[data-linux-command="${CSS.escape(activeCommand)}"]`)?.scrollIntoView({ block: 'nearest' }));
+  };
+  const onWorkbenchClick = (event) => {
+    const categoryButton = event.target.closest('[data-linux-category]');
+    if (categoryButton) {
+      activeCategory = categoryButton.dataset.linuxCategory;
+      render();
+      return;
+    }
+    const commandButton = event.target.closest('[data-linux-command]');
+    if (commandButton) {
+      activeCommand = commandButton.dataset.linuxCommand;
+      renderCommandList();
+      renderDetail();
+      return;
+    }
+    const copyButton = event.target.closest('[data-linux-copy]');
+    if (copyButton) {
+      copyText(copyButton.dataset.linuxCopy).then(() => showToast('命令已复制'));
+      return;
+    }
+    const relatedButton = event.target.closest('[data-linux-related]');
+    if (relatedButton && !relatedButton.disabled) {
+      const relatedCommand = commandByName.get(relatedButton.dataset.linuxRelated);
+      if (!relatedCommand) return;
+      activeCategory = relatedCommand.category;
+      activeCommand = relatedCommand.name;
+      query = '';
+      searchInput.value = '';
+      render();
+      return;
+    }
+    if (event.target.closest('[data-linux-action="clear-search"]')) {
+      query = '';
+      searchInput.value = '';
+      render();
+      searchInput.focus();
+    }
+  };
+  const onSearchInput = () => {
+    query = searchInput.value.trim();
+    render();
+  };
+  const onSearchKeydown = (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      selectCommandByOffset(event.key === 'ArrowDown' ? 1 : -1);
+    }
+    if (event.key === 'Escape' && query) {
+      event.preventDefault();
+      query = '';
+      searchInput.value = '';
+      render();
+    }
+  };
+  const onDocumentKeydown = (event) => {
+    const targetTag = event.target instanceof HTMLElement ? event.target.tagName : '';
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag)) {
+      event.preventDefault();
+      searchInput.focus();
+    }
+  };
+
+  workbench.addEventListener('click', onWorkbenchClick);
+  searchInput.addEventListener('input', onSearchInput);
+  searchInput.addEventListener('keydown', onSearchKeydown);
+  document.addEventListener('keydown', onDocumentKeydown);
+  render();
+  activeWorkspaceCleanup = () => document.removeEventListener('keydown', onDocumentKeydown);
+}
+
 function bindWorkspace(tool) {
   if (tool.category === 'crypto') { bindCryptoWorkspace(tool); return; }
+  if (tool.id === 'json-to-types') { bindJsonTypesWorkspace(); return; }
   if (tool.id === 'time') { bindTimeWorkspace(); return; }
   if (tool.id === 'color') { bindColorWorkspace(); return; }
   if (tool.id === 'gradient') { bindGradientWorkspace(); return; }
@@ -5800,8 +7447,17 @@ function bindWorkspace(tool) {
   if (tool.id === 'slug') { bindSlugWorkspace(); return; }
   if (tool.id === 'fake-data') { bindFakeDataWorkspace(); return; }
   if (tool.id === 'ip') { bindIpWorkspace(); return; }
+  if (tool.id === 'message-queue') { bindMessageQueueWorkspace(); return; }
+  if (tool.id === 'linux-commands') { bindLinuxCommandWorkspace().catch((error) => {
+    const detail = refs.workspace.querySelector('#linux-command-detail');
+    if (detail) detail.innerHTML = `<div class="linux-command-detail-empty is-error"><span>!</span><strong>命令资料加载失败</strong><p>${escapeHtml(error.message)}</p></div>`;
+    showToast(`Linux 命令资料加载失败：${error.message}`);
+  }); return; }
   if (tool.id === 'curl') { bindCurlWorkspace(); return; }
   if (tool.id === 'html') { bindHtmlWorkspace(); return; }
+  if (tool.id === 'xml-format') { bindXmlFormatWorkspace(); return; }
+  if (tool.id === 'xml-converter') { bindXmlConverterWorkspace(); return; }
+  if (tool.id === 'sql-format') { bindSqlFormatWorkspace(); return; }
   if (tool.id === 'mermaid') { bindMermaidWorkspace(); return; }
   if (tool.id === 'markdown-image') { bindMarkdownImageWorkspace(); return; }
   if (tool.id === 'markdown-editor') { bindMarkdownEditorWorkspace(); return; }
@@ -5856,7 +7512,30 @@ function bindWorkspace(tool) {
     execute(button.dataset.toolAction);
   }));
   input?.addEventListener('input', () => { if (['base64', 'url', 'unicode', 'regex'].includes(tool.id)) execute(tool.id === 'base64' ? 'base64-encode' : tool.id === 'url' ? 'url-encode' : tool.id === 'unicode' ? 'unicode-encode' : 'regex'); });
-  content.querySelector('#regex-pattern')?.addEventListener('input', renderRegex);
+  if (tool.id === 'regex') {
+    const patternInput = content.querySelector('#regex-pattern');
+    const presetButtons = [...content.querySelectorAll('[data-regex-preset]')];
+    const updateActivePreset = () => {
+      const activePreset = regexPresets.find((preset) => preset.pattern === patternInput?.value);
+      presetButtons.forEach((button) => {
+        const isActive = button.dataset.regexPreset === activePreset?.id;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+      });
+    };
+    patternInput?.addEventListener('input', () => {
+      renderRegex();
+      updateActivePreset();
+    });
+    presetButtons.forEach((button) => button.addEventListener('click', () => {
+      const preset = regexPresets.find((item) => item.id === button.dataset.regexPreset);
+      if (!preset || !patternInput) return;
+      patternInput.value = preset.pattern;
+      patternInput.dispatchEvent(new Event('input', { bubbles: true }));
+      patternInput.focus();
+    }));
+    updateActivePreset();
+  }
   if (tool.id === 'hash') execute('hash');
   if (tool.id === 'base64') execute('base64-encode');
   if (tool.id === 'url') execute('url-encode');

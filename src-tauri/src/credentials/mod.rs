@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use aes_gcm::{aead::Generate, Aes256Gcm, Key};
+use aes_gcm::{Aes256Gcm, Key, aead::Generate};
 use zeroize::Zeroizing;
 
 use crate::error::{AppError, AppResult};

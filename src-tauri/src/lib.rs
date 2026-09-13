@@ -2,6 +2,7 @@ mod commands;
 mod credentials;
 mod crypto;
 mod error;
+mod mq;
 mod state;
 mod storage;
 
@@ -17,6 +18,7 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)?;
             let state = AppState::initialize(app_data_dir.join("byetools.db"), system_provider())?;
             app.manage(state);
+            app.manage(mq::MqState::default());
             Ok(())
         })
         .on_page_load(|webview, payload| {
@@ -63,6 +65,10 @@ pub fn run() {
             commands::crypto_config::crypto_config_delete,
             commands::crypto_config::crypto_config_migrate,
             commands::crypto_config::crypto_config_rotate_key,
+            commands::message_queue::mq_test_connection,
+            commands::message_queue::mq_send_message,
+            commands::message_queue::mq_start_consumer,
+            commands::message_queue::mq_stop_consumer,
         ])
         .run(tauri::generate_context!())
         .expect("ByeTools 桌面应用启动失败");

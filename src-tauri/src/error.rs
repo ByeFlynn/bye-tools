@@ -16,6 +16,8 @@ pub enum AppError {
     StorageFailed,
     #[error("SQLCipher 初始化失败")]
     CipherUnavailable,
+    #[error("消息队列操作失败：{0}")]
+    MessageQueueFailed(String),
     #[error("内部数据格式错误")]
     InvalidData,
 }
@@ -30,6 +32,7 @@ impl AppError {
             Self::NotFound => "NOT_FOUND",
             Self::StorageFailed => "STORAGE_FAILED",
             Self::CipherUnavailable => "CIPHER_UNAVAILABLE",
+            Self::MessageQueueFailed(_) => "MESSAGE_QUEUE_FAILED",
             Self::InvalidData => "INVALID_DATA",
         }
     }
