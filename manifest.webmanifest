@@ -10,7 +10,7 @@
   "theme_color": "#7552ff",
   "icons": [
     {
-      "src": "./icons/byetools.svg",
+      "src": "../icons/byetools.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
