@@ -29,7 +29,7 @@ const tools = [
   { id: 'sm2', name: 'SM2 加密解密', description: '国密 SM2 非对称加密与签名参数', category: 'crypto', label: '加密解密', icon: 'S2', iconClass: 'icon-sm2', environment: 'local', cryptoType: 'asymmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'sm2 国密 非对称 加密 解密 签名' },
   { id: 'sm3', name: 'SM3 摘要', description: '国密 SM3 摘要计算', category: 'crypto', label: '加密解密', icon: 'S3', iconClass: 'icon-sm3', environment: 'local', cryptoType: 'digest', capability: 'ready', capabilityLabel: '可运行', keywords: 'sm3 国密 hash 摘要' },
   { id: 'sm4', name: 'SM4 加密解密', description: '国密 SM4 对称加密与解密参数', category: 'crypto', label: '加密解密', icon: 'S4', iconClass: 'icon-sm4', environment: 'local', cryptoType: 'symmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'sm4 国密 对称 加密 解密' },
-  { id: 'aes', name: 'AES 加密解密', description: 'AES-GCM、AES-CBC、AES-CTR 加密与解密', category: 'crypto', label: '加密解密', icon: 'AES', iconClass: 'icon-aes', environment: 'local', cryptoType: 'symmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'aes aes-gcm aes-cbc aes-ctr 对称 加密 解密' },
+  { id: 'aes', name: 'AES 加密解密', description: 'AES-GCM、CBC、CTR、CFB、OFB、ECB 加密与解密', category: 'crypto', label: '加密解密', icon: 'AES', iconClass: 'icon-aes', environment: 'local', cryptoType: 'symmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'aes aes-gcm aes-cbc aes-ctr aes-cfb aes-ofb aes-ecb 对称 加密 解密' },
   { id: 'des', name: 'DES 加密解密', description: 'DES 对称加密与解密参数（不推荐）', category: 'crypto', label: '加密解密', icon: 'DES', iconClass: 'icon-des', environment: 'local', cryptoType: 'symmetric', capability: 'deprecated', capabilityLabel: '不推荐', keywords: 'des 对称 加密 解密 弱算法 已淘汰' },
   { id: '3des', name: '3DES 加密解密', description: 'Triple DES-CBC、ECB 加解密（仅兼容旧系统）', category: 'crypto', label: '加密解密', icon: '3D', iconClass: 'icon-3des', environment: 'local', cryptoType: 'symmetric', capability: 'ready', capabilityLabel: '兼容性支持', keywords: '3des triple des desede tdea 对称 加密 解密 兼容 旧系统' },
   { id: 'rsa', name: 'RSA 加密解密', description: 'RSA-OAEP、PKCS#1 v1.5 非对称加解密', category: 'crypto', label: '加密解密', icon: 'RSA', iconClass: 'icon-rsa', environment: 'local', cryptoType: 'asymmetric', capability: 'ready', capabilityLabel: '可运行', keywords: 'rsa rsa-oaep pkcs1 pkcs#1 公钥 私钥 非对称 加密 解密 密钥对' },
@@ -1611,11 +1611,11 @@ function ipWorkbenchMarkup() {
       <label class="special-input-field"><span>IP 地址</span><input id="ip-input" type="text" value="8.8.8.8" spellcheck="false" placeholder="输入 IPv4 或 IPv6 地址…" /></label>
       <button class="primary-button" data-tool-action="ip-query">查询地址</button>
       <button class="secondary-button" data-tool-action="ip-clear">清空</button>
-      <span class="special-toolbar-note"><i></i>本地校验 · 归属地服务可按需接入</span>
+      <span class="special-toolbar-note"><i></i>本地校验 · 公网归属地查询</span>
     </div>
     <div class="ip-workspace-grid">
       <section class="workspace-card ip-result-card"><div class="workspace-card-head"><span>地址概览</span><span id="ip-status">等待查询</span></div><div class="ip-result-body" id="ip-result"></div></section>
-      <aside class="info-panel"><div class="panel-heading"><span class="panel-heading-mark"></span><div><strong>查询说明</strong><small>先完成本地地址识别</small></div></div><div class="info-list"><div><b>支持类型</b><span>IPv4、IPv6</span></div><div><b>本地判断</b><span>公网、内网、回环、链路本地</span></div><div><b>隐私边界</b><span>输入内容只在当前设备处理</span></div></div><div class="info-callout">归属地、运营商等外部信息需要配置 IP 数据服务后显示。</div></aside>
+      <aside class="info-panel"><div class="panel-heading"><span class="panel-heading-mark"></span><div><strong>查询说明</strong><small>先完成本地地址识别</small></div></div><div class="info-list"><div><b>支持类型</b><span>IPv4、IPv6</span></div><div><b>本地判断</b><span>公网、内网、回环、链路本地</span></div><div><b>联网信息</b><span>国家、地区、城市、运营商、ASN、时区</span></div><div><b>隐私边界</b><span>仅在查询公网地址时发送给 IPQuery 或 FreeIPAPI</span></div></div><div class="info-callout">私有、回环和链路本地地址不会发起联网请求。</div></aside>
     </div>
   </div>`;
 }
@@ -2556,22 +2556,127 @@ function bindIpWorkspace() {
   const input = content.querySelector('#ip-input');
   const result = content.querySelector('#ip-result');
   const status = content.querySelector('#ip-status');
-  const render = () => {
+  const queryButton = content.querySelector('[data-tool-action="ip-query"]');
+  let requestController = null;
+  const fetchLocation = async (address, signal) => {
+    const providers = [
+      {
+        name: 'IPQuery',
+        url: `https://api.ipquery.io/${encodeURIComponent(address)}`,
+        normalize: (payload) => ({
+          country: payload.location?.country,
+          region: payload.location?.state,
+          city: payload.location?.city,
+          latitude: payload.location?.latitude,
+          longitude: payload.location?.longitude,
+          timezone: { id: payload.location?.timezone },
+          connection: { asn: String(payload.isp?.asn || '').replace(/^AS/i, ''), isp: payload.isp?.isp, org: payload.isp?.org },
+        }),
+      },
+      {
+        name: 'FreeIPAPI',
+        url: `https://free.freeipapi.com/api/json/${encodeURIComponent(address)}`,
+        normalize: (payload) => ({
+          country: payload.countryName,
+          region: payload.regionName,
+          city: payload.cityName,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          timezone: { id: Array.isArray(payload.timeZones) && payload.timeZones.length === 1 ? payload.timeZones[0] : '' },
+          connection: { asn: payload.asn, isp: payload.asnOrganization, org: payload.asnOrganization },
+        }),
+      },
+    ];
+    const errors = [];
+    for (const provider of providers) {
+      try {
+        const response = await fetch(provider.url, { signal, referrerPolicy: 'no-referrer' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const location = provider.normalize(payload);
+        if (!location.country && !location.region && !location.city) throw new Error('响应缺少归属地信息');
+        return { ...location, provider: provider.name };
+      } catch (error) {
+        if (error.name === 'AbortError') throw error;
+        errors.push(`${provider.name}: ${error.message}`);
+      }
+    }
+    throw new Error(errors.join('；'));
+  };
+  const renderEmpty = () => {
     const parsed = parseIpAddress(input.value);
     if (!parsed) {
       status.textContent = input.value.trim() ? '地址格式有误' : '等待查询';
       status.className = input.value.trim() ? 'crypto-status-error' : '';
       result.innerHTML = `<div class="special-empty"><span class="special-empty-icon">IP</span><strong>${input.value.trim() ? '请输入有效的 IPv4 或 IPv6 地址' : '输入地址开始查询'}</strong><small>地址识别在当前设备完成</small></div>`;
+      return null;
+    }
+    return parsed;
+  };
+  const renderResult = (parsed, location = null, note = '') => {
+    const locationLabel = location ? [location.country, location.region, location.city].filter(Boolean).join(' · ') || '未知' : parsed.scope === '公网地址' ? '点击查询获取' : '不适用于本地地址';
+    const provider = location?.connection?.isp || location?.connection?.org || '未知';
+    const asn = location?.connection?.asn ? `AS${location.connection.asn}` : '未知';
+    const timezone = location?.timezone?.id ? `${location.timezone.id}${location.timezone.utc ? ` · UTC${location.timezone.utc}` : ''}` : '未知';
+    const coordinates = Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude) ? `${location.latitude}, ${location.longitude}` : '未知';
+    const extraRows = location ? `<div><span>运营商</span><b>${escapeHtml(provider)}</b></div><div><span>ASN</span><b>${escapeHtml(asn)}</b></div><div><span>时区</span><b>${escapeHtml(timezone)}</b></div><div><span>坐标</span><b>${escapeHtml(coordinates)}</b></div>` : '';
+    result.innerHTML = `<div class="ip-hero"><span class="ip-hero-label">${escapeHtml(parsed.version)}</span><strong>${escapeHtml(parsed.normalized)}</strong><span class="ip-scope ip-scope-${parsed.scope === '公网地址' ? 'public' : 'private'}">${escapeHtml(parsed.scope)}</span></div><div class="ip-detail-grid"><div><span>地址版本</span><b>${escapeHtml(parsed.version)}</b></div><div><span>地址范围</span><b>${escapeHtml(parsed.scope)}</b></div><div><span>归属地</span><b>${escapeHtml(locationLabel)}</b></div><div><span>处理方式</span><b>${location ? '联网查询' : '本地识别'}</b></div>${extraRows}</div><div class="ip-result-note">${escapeHtml(note || (parsed.scope === '公网地址' ? '点击“查询地址”获取公网归属地和网络信息。' : '本地地址不会发送到外部归属地服务。'))}</div>`;
+  };
+  const renderPreview = () => {
+    requestController?.abort();
+    requestController = null;
+    queryButton.disabled = false;
+    const parsed = renderEmpty();
+    if (!parsed) return;
+    status.textContent = parsed.scope === '公网地址' ? '等待联网查询' : '本地识别完成';
+    status.className = parsed.scope === '公网地址' ? '' : 'crypto-status-success';
+    renderResult(parsed);
+  };
+  const query = async () => {
+    requestController?.abort();
+    requestController = null;
+    queryButton.disabled = false;
+    const parsed = renderEmpty();
+    if (!parsed) return;
+    if (parsed.scope !== '公网地址') {
+      status.textContent = '本地识别完成';
+      status.className = 'crypto-status-success';
+      renderResult(parsed);
       return;
     }
-    status.textContent = '识别完成';
-    status.className = 'crypto-status-success';
-    result.innerHTML = `<div class="ip-hero"><span class="ip-hero-label">${escapeHtml(parsed.version)}</span><strong>${escapeHtml(parsed.normalized)}</strong><span class="ip-scope ip-scope-${parsed.scope === '公网地址' ? 'public' : 'private'}">${escapeHtml(parsed.scope)}</span></div><div class="ip-detail-grid"><div><span>地址版本</span><b>${escapeHtml(parsed.version)}</b></div><div><span>地址范围</span><b>${escapeHtml(parsed.scope)}</b></div><div><span>处理方式</span><b>本地识别</b></div><div><span>归属地</span><b class="ip-pending">待接入服务</b></div></div><div class="ip-result-note">当前版本只判断地址类型与范围，不会把未接入的归属地服务结果伪装成本地数据。</div>`;
+    requestController = new AbortController();
+    const controller = requestController;
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+    queryButton.disabled = true;
+    status.textContent = '正在查询';
+    status.className = '';
+    renderResult(parsed, null, '正在获取归属地和网络信息…');
+    try {
+      const location = await fetchLocation(parsed.normalized, controller.signal);
+      if (requestController !== controller) return;
+      status.textContent = '查询完成';
+      status.className = 'crypto-status-success';
+      renderResult(parsed, location, `归属地来自 ${location.provider}，仅供网络排查参考，不能用于精确定位。`);
+    } catch (error) {
+      if (requestController !== controller) return;
+      const message = error.name === 'AbortError' ? '查询超时，请稍后重试' : error.message;
+      status.textContent = '查询失败';
+      status.className = 'crypto-status-error';
+      renderResult(parsed, null, `归属地查询失败：${message}`);
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (requestController === controller) {
+        requestController = null;
+        queryButton.disabled = false;
+      }
+    }
   };
-  content.querySelector('[data-tool-action="ip-query"]').addEventListener('click', render);
-  content.querySelector('[data-tool-action="ip-clear"]').addEventListener('click', () => { input.value = ''; render(); input.focus(); });
-  input.addEventListener('keydown', (event) => { if (event.key === 'Enter') render(); });
-  render();
+  queryButton.addEventListener('click', query);
+  content.querySelector('[data-tool-action="ip-clear"]').addEventListener('click', () => { input.value = ''; renderPreview(); input.focus(); });
+  input.addEventListener('input', renderPreview);
+  input.addEventListener('keydown', (event) => { if (event.key === 'Enter') query(); });
+  renderPreview();
+  activeWorkspaceCleanup = () => requestController?.abort();
 }
 
 function messageQueueTargetMarkup(broker) {
@@ -2703,7 +2808,7 @@ function bindMessageQueueWorkspace() {
     if (!config.address) return { config, error: '请先填写 Broker 地址' };
     if (!config.port || Number(config.port) < 1 || Number(config.port) > 65535) return { config, error: '端口范围应为 1-65535' };
     if (config.password && !config.username) return { config, error: '填写密码时必须同时填写用户名' };
-    if (config.broker === 'kafka' && (config.username || config.password)) return { config, error: '当前桌面版 Kafka 暂不支持 SASL 用户名密码认证' };
+    if (['kafka', 'rocketmq'].includes(config.broker) && config.username && !config.password) return { config, error: `${brokerLabels[config.broker]} 填写用户名时必须同时填写密码` };
     if (config.broker === 'rocketmq' && config.username && !config.password) return { config, error: 'RocketMQ 使用 AccessKey 时必须同时填写 SecretKey' };
     const target = config.broker === 'rabbitmq' ? config.queue : config.topic;
     if (!target) return { config, error: config.broker === 'rabbitmq' ? '请先填写 Queue' : '请先填写 Topic' };
@@ -5514,8 +5619,8 @@ function cryptoModeHint(tool, mode) {
 }
 
 function cryptoModeCapability(tool, mode) {
-  if (tool.id === 'aes' && ['GCM', 'CBC', 'CTR'].includes(mode)) return 'ready';
-  if (tool.id === 'sm4' && ['CBC', 'ECB'].includes(mode)) return 'ready';
+  if (tool.id === 'aes' && ['GCM', 'CBC', 'CTR', 'CFB', 'OFB', 'ECB'].includes(mode)) return 'ready';
+  if (tool.id === 'sm4' && ['CBC', 'ECB', 'CTR', 'CFB', 'OFB'].includes(mode)) return 'ready';
   if (tool.id === '3des' && ['CBC', 'ECB'].includes(mode)) return 'ready';
   if (tool.id === 'rsa' && ['RSA-OAEP', 'RSAES-PKCS1-v1_5'].includes(mode)) return 'ready';
   return tool.capability === 'deprecated' ? 'deprecated' : 'library';
@@ -5840,6 +5945,7 @@ function cryptoWorkbenchMarkup(tool) {
   const isAsymmetric = tool.cryptoType === 'asymmetric';
   const isRsa = tool.id === 'rsa';
   const isAes = tool.id === 'aes';
+  const isExecutable = tool.capability === 'ready' || ['md5', 'des'].includes(tool.id);
   const initialMode = isDigest || (isAsymmetric && !isRsa) ? '' : cryptoModeOptions(tool).match(/value="([^"]+)"/)?.[1] || 'CBC';
   const modeHint = initialMode ? cryptoModeHint(tool, initialMode) : ['IV / Nonce', '按算法规范填写', '按算法规范填写'];
   const initialModeCapability = initialMode ? cryptoModeCapability(tool, initialMode) : '';
@@ -5887,7 +5993,7 @@ function cryptoWorkbenchMarkup(tool) {
     <div class="crypto-action-bar"><div class="crypto-action-main">${operationButtons}</div><div class="crypto-action-secondary"><button class="secondary-button" type="button" data-tool-action="crypto-clear">清空</button><button class="secondary-button" type="button" data-tool-action="copy-crypto-output">复制结果</button></div><div class="crypto-config-actions" aria-label="加密配置"><button class="secondary-button" type="button" data-crypto-config-action="save">保存配置</button><button class="secondary-button" type="button" data-crypto-config-action="history">配置历史</button></div></div>
     <div class="crypto-panel-grid">
       <section class="workspace-card crypto-input-card"><div class="workspace-card-head"><span>输入内容</span><span id="crypto-input-meta">${isDigest ? 'UTF-8 文本' : 'UTF-8 明文'}</span></div><textarea id="crypto-input" spellcheck="false" placeholder="${isDigest ? '输入要计算摘要的文本…' : '输入要加密的明文…'}">ByeTools 本地优先</textarea></section>
-      <section class="workspace-card crypto-output-card"><div class="workspace-card-head"><span>输出结果</span><span id="crypto-status">${tool.capability === 'ready' ? '等待操作' : statusText}</span></div><pre id="crypto-output" aria-live="polite">${tool.capability === 'ready' ? '点击“加密”或“解密”生成结果…' : '当前能力尚未接入，暂不生成结果。'}</pre></section>
+      <section class="workspace-card crypto-output-card"><div class="workspace-card-head"><span>输出结果</span><span id="crypto-status">${isExecutable ? '等待操作' : statusText}</span></div><pre id="crypto-output" aria-live="polite">${isExecutable ? isDigest ? '点击“计算摘要”生成结果…' : '点击“加密”或“解密”生成结果…' : '当前能力尚未接入，暂不生成结果。'}</pre></section>
     </div>
     <div class="crypto-note"><span class="crypto-note-icon">i</span><span>${note}</span></div>
   </div>`;
@@ -6630,6 +6736,36 @@ function cryptoBytesToWordArray(bytes) {
   return CryptoJS.lib.WordArray.create(bytes);
 }
 
+function sm4EncryptBlock(block, key) {
+  const result = sm4Library.encrypt([...block], key, { mode: 'ecb', padding: 'none', output: 'array' });
+  if (!Array.isArray(result) || result.length !== 16) throw new Error('SM4 单块加密失败');
+  return Uint8Array.from(result);
+}
+
+function incrementCryptoCounter(counter) {
+  for (let index = counter.length - 1; index >= 0; index -= 1) {
+    counter[index] = (counter[index] + 1) & 0xff;
+    if (counter[index] !== 0) break;
+  }
+}
+
+function transformSm4Stream(data, key, iv, mode, decrypting) {
+  const output = new Uint8Array(data.length);
+  let state = Uint8Array.from(iv);
+  for (let offset = 0; offset < data.length; offset += 16) {
+    if (mode === 'OFB') state = sm4EncryptBlock(state, key);
+    const stream = mode === 'OFB' ? state : sm4EncryptBlock(state, key);
+    const size = Math.min(16, data.length - offset);
+    const source = data.slice(offset, offset + size);
+    const target = new Uint8Array(size);
+    for (let index = 0; index < size; index += 1) target[index] = source[index] ^ stream[index];
+    output.set(target, offset);
+    if (mode === 'CTR') incrementCryptoCounter(state);
+    if (mode === 'CFB') state = Uint8Array.from(decrypting ? source : target);
+  }
+  return output;
+}
+
 function rsaCryptoAlgorithm(mode, hash) {
   return mode === 'RSA-OAEP' ? { name: mode, hash } : { name: mode };
 }
@@ -6815,6 +6951,12 @@ function bindCryptoWorkspace(tool) {
     output.textContent = reason;
     setStatus(tool.capability === 'deprecated' ? '不推荐使用' : '待接入密码库', tool.capability === 'deprecated' ? 'warning' : 'pending');
   };
+  const executeMd5 = async () => {
+    const digestHex = CryptoJS.MD5(input.value).toString(CryptoJS.enc.Hex);
+    const bytes = hexToBytes(digestHex, 'MD5 摘要');
+    output.textContent = formatCryptoBytes(bytes, format.value);
+    setStatus(`已完成 · ${bytes.length} 字节`, 'success');
+  };
   const executeSha2 = async () => {
     const variant = content.querySelector('#crypto-variant').value;
     const digest = await window.crypto.subtle.digest(variant, new TextEncoder().encode(input.value));
@@ -6868,14 +7010,23 @@ function bindCryptoWorkspace(tool) {
   };
   const executeSm4 = async () => {
     const mode = content.querySelector('#crypto-mode').value;
-    if (!['CBC', 'ECB'].includes(mode)) throw new Error(`SM4-${mode} 暂不支持，请使用 CBC 或 ECB 模式`);
+    if (!['CBC', 'ECB', 'CTR', 'CFB', 'OFB'].includes(mode)) throw new Error(`不支持 SM4-${mode} 模式`);
     const keyEncoding = content.querySelector('#crypto-key-encoding')?.value || 'utf8';
     const ivEncoding = content.querySelector('#crypto-iv-encoding')?.value || 'utf8';
     const keyBytes = cryptoSecretBytesByEncoding(content.querySelector('#crypto-key').value, 'SM4 密钥', [16], keyEncoding);
     const keyValue = bytesToHex(keyBytes);
     const paddingValue = content.querySelector('#crypto-padding').value;
     const ivInput = content.querySelector('#crypto-iv');
-    const ivValue = mode === 'CBC' ? bytesToHex(cryptoSecretBytesByEncoding(ivInput.value, 'SM4-CBC 的 IV', [16], ivEncoding)) : '';
+    const ivBytes = mode === 'ECB' ? null : cryptoSecretBytesByEncoding(ivInput.value, `SM4-${mode} 的 IV`, [16], ivEncoding);
+    if (['CTR', 'CFB', 'OFB'].includes(mode)) {
+      if (paddingValue !== 'NONE') throw new Error(`SM4-${mode} 应使用 NoPadding`);
+      const source = activeOperation === 'encrypt' ? new TextEncoder().encode(input.value) : parseCryptoBytes(input.value, format.value);
+      const result = transformSm4Stream(source, keyValue, ivBytes, mode, activeOperation === 'decrypt');
+      output.textContent = activeOperation === 'decrypt' ? new TextDecoder().decode(result) : formatCryptoBytes(result, format.value);
+      setStatus(`已完成 · ${result.length} 字节`, 'success');
+      return;
+    }
+    const ivValue = mode === 'CBC' ? bytesToHex(ivBytes) : '';
     const options = { mode: mode.toLowerCase(), padding: paddingValue === 'NONE' ? 'none' : 'pkcs#7', output: 'array' };
     if (mode === 'CBC') options.iv = ivValue;
     if (activeOperation === 'encrypt') {
@@ -6889,6 +7040,32 @@ function bindCryptoWorkspace(tool) {
     const cipherBytes = parseCryptoBytes(input.value, format.value);
     if (!cipherBytes.length || cipherBytes.length % 16 !== 0) throw new Error('SM4 密文长度应为 16 字节的整数倍');
     const plainBytes = Uint8Array.from(sm4Library.decrypt(cipherBytes, keyValue, options));
+    output.textContent = new TextDecoder().decode(plainBytes);
+    setStatus(`已完成 · ${plainBytes.length} 字节`, 'success');
+  };
+  const executeDes = async () => {
+    const mode = content.querySelector('#crypto-mode').value;
+    if (!['CBC', 'ECB'].includes(mode)) throw new Error(`不支持 DES-${mode} 模式`);
+    const keyBytes = cryptoSecretBytes(content.querySelector('#crypto-key').value, 'DES 密钥', [8]);
+    const paddingValue = content.querySelector('#crypto-padding').value;
+    const ivInput = content.querySelector('#crypto-iv');
+    const iv = mode === 'CBC' ? cryptoBytesToWordArray(cryptoSecretBytes(ivInput.value, 'DES-CBC 的 IV', [8])) : undefined;
+    const options = { mode: mode === 'CBC' ? CryptoJS.mode.CBC : CryptoJS.mode.ECB, padding: paddingValue === 'NONE' ? CryptoJS.pad.NoPadding : CryptoJS.pad.Pkcs7 };
+    if (iv) options.iv = iv;
+    const key = cryptoBytesToWordArray(keyBytes);
+    if (activeOperation === 'encrypt') {
+      const plainBytes = new TextEncoder().encode(input.value);
+      if (paddingValue === 'NONE' && plainBytes.length % 8 !== 0) throw new Error('DES NoPadding 要求明文长度为 8 字节的整数倍');
+      const encrypted = CryptoJS.DES.encrypt(cryptoBytesToWordArray(plainBytes), key, options);
+      const cipherBytes = cryptoWordArrayToBytes(encrypted.ciphertext);
+      output.textContent = formatCryptoBytes(cipherBytes, format.value);
+      setStatus(`已完成 · ${cipherBytes.length} 字节`, 'success');
+      return;
+    }
+    const cipherBytes = parseCryptoBytes(input.value, format.value);
+    if (!cipherBytes.length || cipherBytes.length % 8 !== 0) throw new Error('DES 密文长度应为 8 字节的整数倍');
+    const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext: cryptoBytesToWordArray(cipherBytes) });
+    const plainBytes = cryptoWordArrayToBytes(CryptoJS.DES.decrypt(cipherParams, key, options));
     output.textContent = new TextDecoder().decode(plainBytes);
     setStatus(`已完成 · ${plainBytes.length} 字节`, 'success');
   };
@@ -6957,11 +7134,33 @@ function bindCryptoWorkspace(tool) {
   };
   const executeAes = async () => {
     const mode = content.querySelector('#crypto-mode').value;
-    if (!['GCM', 'CBC', 'CTR'].includes(mode)) throw new Error(`AES-${mode} 当前需要接入密码库`);
+    if (!['GCM', 'CBC', 'CTR', 'CFB', 'OFB', 'ECB'].includes(mode)) throw new Error(`不支持 AES-${mode} 模式`);
     const keyLength = Number(content.querySelector('#crypto-key-length').value) / 8;
     const key = cryptoSecretBytes(content.querySelector('#crypto-key').value, 'AES 密钥', [keyLength]);
     const padding = content.querySelector('#crypto-padding').value;
     const ivInput = content.querySelector('#crypto-iv');
+    if (['CFB', 'OFB', 'ECB'].includes(mode)) {
+      const iv = mode === 'ECB' ? undefined : cryptoBytesToWordArray(cryptoSecretBytes(ivInput.value, `AES-${mode} 的 IV`, [16]));
+      const options = { mode: CryptoJS.mode[mode], padding: padding === 'NONE' ? CryptoJS.pad.NoPadding : CryptoJS.pad.Pkcs7 };
+      if (iv) options.iv = iv;
+      const cryptoKey = cryptoBytesToWordArray(key);
+      if (activeOperation === 'encrypt') {
+        const plainBytes = new TextEncoder().encode(input.value);
+        if (mode === 'ECB' && padding === 'NONE' && plainBytes.length % 16 !== 0) throw new Error('AES-ECB NoPadding 要求明文长度为 16 字节的整数倍');
+        const encrypted = CryptoJS.AES.encrypt(cryptoBytesToWordArray(plainBytes), cryptoKey, options);
+        const cipherBytes = cryptoWordArrayToBytes(encrypted.ciphertext);
+        output.textContent = formatCryptoBytes(cipherBytes, format.value);
+        setStatus(`已完成 · ${cipherBytes.length} 字节`, 'success');
+        return;
+      }
+      const cipherBytes = parseCryptoBytes(input.value, format.value);
+      if (!cipherBytes.length || (mode === 'ECB' && cipherBytes.length % 16 !== 0)) throw new Error(`AES-${mode} 密文长度不正确`);
+      const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext: cryptoBytesToWordArray(cipherBytes) });
+      const plainBytes = cryptoWordArrayToBytes(CryptoJS.AES.decrypt(cipherParams, cryptoKey, options));
+      output.textContent = new TextDecoder().decode(plainBytes);
+      setStatus(`已完成 · ${plainBytes.length} 字节`, 'success');
+      return;
+    }
     const iv = mode === 'ECB' ? null : cryptoSecretBytes(ivInput.value, `AES-${mode} 的 ${mode === 'GCM' ? 'Nonce' : 'IV'}`, mode === 'GCM' ? [12, 13, 14, 15, 16] : [16]);
     if (mode === 'GCM' && (iv.length < 12 || iv.length > 16)) throw new Error('AES-GCM 的 Nonce 建议使用 12 字节，当前支持 12 至 16 字节');
     if (mode === 'CBC' && iv.length !== 16) throw new Error('AES-CBC 的 IV 应为 16 字节');
@@ -6978,11 +7177,13 @@ function bindCryptoWorkspace(tool) {
   };
   const execute = async () => {
     try {
-      if (tool.id === 'sha2') await executeSha2();
+      if (tool.id === 'md5') await executeMd5();
+      else if (tool.id === 'sha2') await executeSha2();
       else if (tool.id === 'sha3') await executeSha3();
       else if (tool.id === 'sm3') await executeSm3();
       else if (tool.id === 'sm2') await executeSm2();
       else if (tool.id === 'sm4') await executeSm4();
+      else if (tool.id === 'des') await executeDes();
       else if (tool.id === '3des') await execute3Des();
       else if (tool.id === 'rsa') await executeRsa();
       else if (tool.id === 'aes') await executeAes();
@@ -7198,8 +7399,8 @@ function bindCryptoWorkspace(tool) {
   syncInputHint();
   syncSecretLengths();
   renderAlgorithmPicker();
-  if (tool.id === 'sha2' || tool.id === 'sha3' || tool.id === 'sm3') execute();
-  if (tool.capability !== 'ready' && tool.id !== 'sha2') renderUnavailable();
+  if (['md5', 'sha2', 'sha3', 'sm3'].includes(tool.id)) execute();
+  if (tool.capability !== 'ready' && !['md5', 'des'].includes(tool.id)) renderUnavailable();
   activeWorkspaceCleanup = () => {
     document.removeEventListener('click', onAlgorithmDocumentClick);
     algorithmMenu?.removeEventListener('keydown', onAlgorithmMenuKeydown);

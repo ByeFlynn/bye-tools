@@ -459,6 +459,7 @@ test('所有工具均可打开且不会产生页面异常', async ({ page }) => 
     await test.step(`打开 ${toolId}`, async () => {
       await page.locator(`.tool-card[data-tool-id="${toolId}"]`).evaluate((card) => card.click());
       await expect(page.locator('#tool-workspace')).toBeVisible();
+      await expect(page.locator('.workspace-notice')).toHaveCount(0);
       await page.locator('[data-action="home"]').first().click();
     });
   }
@@ -660,6 +661,59 @@ test('3DES 工具支持 CBC、ECB 加解密和原文密钥', async ({ page }) =>
   await expect(page.locator('#crypto-output')).toHaveText('ByeTools 3DES ECB');
 });
 
+test('DES 工具支持 CBC、ECB 加解密并保留安全警告', async ({ page }) => {
+  await page.goto('/#/tool/des');
+  await page.locator('#crypto-key').fill('DESKey12');
+  await page.locator('#crypto-iv').fill('DESIv123');
+  await page.locator('#crypto-input').fill('ByeTools DES 测试');
+  await expect(page.locator('.crypto-note')).toContainText('不适合新系统');
+
+  for (const mode of ['CBC', 'ECB']) {
+    await page.locator('#crypto-mode').selectOption(mode);
+    await page.locator('#crypto-input').fill(`DES ${mode} 测试`);
+    await page.locator('[data-crypto-operation="encrypt"]').click();
+    const encrypted = await page.locator('#crypto-output').textContent();
+    expect(encrypted).not.toContain('尚未接入');
+    await page.locator('#crypto-input').fill(encrypted);
+    await page.locator('[data-crypto-operation="decrypt"]').click();
+    await expect(page.locator('#crypto-output')).toHaveText(`DES ${mode} 测试`);
+  }
+});
+
+test('AES 支持 CFB、OFB、ECB 模式加解密', async ({ page }) => {
+  await page.goto('/#/tool/aes');
+  await page.locator('#crypto-key').fill('ByeToolsKey12345');
+
+  for (const mode of ['CFB', 'OFB', 'ECB']) {
+    await page.locator('#crypto-mode').selectOption(mode);
+    if (mode !== 'ECB') await page.locator('#crypto-iv').fill('ByeToolsIV123456');
+    await expect(page.locator('#crypto-mode-capability')).toContainText('浏览器可运行');
+    await page.locator('#crypto-input').fill(`AES ${mode} 模式测试`);
+    await page.locator('[data-crypto-operation="encrypt"]').click();
+    const encrypted = await page.locator('#crypto-output').textContent();
+    await page.locator('#crypto-input').fill(encrypted);
+    await page.locator('[data-crypto-operation="decrypt"]').click();
+    await expect(page.locator('#crypto-output')).toHaveText(`AES ${mode} 模式测试`);
+  }
+});
+
+test('SM4 支持 CTR、CFB、OFB 模式加解密', async ({ page }) => {
+  await page.goto('/#/tool/sm4');
+  await page.locator('#crypto-key').fill('SM4Key-123456789');
+  await page.locator('#crypto-iv').fill('SM4Iv-1234567890');
+
+  for (const mode of ['CTR', 'CFB', 'OFB']) {
+    await page.locator('#crypto-mode').selectOption(mode);
+    await expect(page.locator('#crypto-mode-capability')).toContainText('浏览器可运行');
+    await page.locator('#crypto-input').fill(`SM4 ${mode} 模式支持任意长度文本`);
+    await page.locator('[data-crypto-operation="encrypt"]').click();
+    const encrypted = await page.locator('#crypto-output').textContent();
+    await page.locator('#crypto-input').fill(encrypted);
+    await page.locator('[data-crypto-operation="decrypt"]').click();
+    await expect(page.locator('#crypto-output')).toHaveText(`SM4 ${mode} 模式支持任意长度文本`);
+  }
+});
+
 test('加密算法选择器显示图标和说明并支持切换', async ({ page }) => {
   await page.goto('/');
   await page.locator('.tool-card[data-tool-id="aes"]').click();
@@ -709,6 +763,90 @@ test('SHA-3 摘要支持三种标准变体和 Base64 输出', async ({ page }) =
   await page.locator('#crypto-format').selectOption('base64');
   await page.getByRole('button', { name: '计算摘要', exact: true }).click();
   await expect(page.locator('#crypto-output')).toHaveText('t1GFCxpXFopWk82SS2sJbgj2IYJ0RPcNiE9dAkDScS4Q4RbpGSrzyRp+xXZH45NAVzQLTPQI1aVlkvgnTuxT8A==');
+});
+
+test('MD5 摘要支持 Hex 和 Base64 输出', async ({ page }) => {
+  await page.goto('/#/tool/md5');
+  await page.locator('#crypto-input').fill('abc');
+
+  await page.getByRole('button', { name: '计算摘要', exact: true }).click();
+  await expect(page.locator('#crypto-output')).toHaveText('900150983cd24fb0d6963f7d28e17f72');
+  await expect(page.locator('#crypto-status')).toContainText('已完成');
+
+  await page.locator('#crypto-format').selectOption('base64');
+  await page.getByRole('button', { name: '计算摘要', exact: true }).click();
+  await expect(page.locator('#crypto-output')).toHaveText('kAFQmDzST7DWlj99KOF/cg==');
+});
+
+test('IP 查询显示公网归属地且本地地址不联网', async ({ page }) => {
+  let requestCount = 0;
+  await page.route('https://api.ipquery.io/**', async (route) => {
+    requestCount += 1;
+    await route.fulfill({ status: 429, body: '请求过于频繁' });
+  });
+  await page.route('https://free.freeipapi.com/**', async (route) => {
+    requestCount += 1;
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ipAddress: '8.8.8.8',
+        ipVersion: 4,
+        countryName: '美国',
+        countryCode: 'US',
+        regionName: '加利福尼亚州',
+        cityName: '圣何塞',
+        latitude: 37.3394,
+        longitude: -121.895,
+        timeZones: ['America/Los_Angeles'],
+        asn: 15169,
+        asnOrganization: 'Google LLC',
+      }),
+    });
+  });
+  await page.goto('/#/tool/ip');
+  await page.locator('[data-tool-action="ip-query"]').click();
+  await expect(page.locator('#ip-status')).toHaveText('查询完成');
+  await expect(page.locator('#ip-result')).toContainText('美国 · 加利福尼亚州 · 圣何塞');
+  await expect(page.locator('#ip-result')).toContainText('Google LLC');
+  await expect(page.locator('#ip-result')).toContainText('AS15169');
+
+  await page.locator('#ip-input').fill('192.168.1.1');
+  await page.locator('[data-tool-action="ip-query"]').click();
+  await expect(page.locator('#ip-status')).toHaveText('本地识别完成');
+  await expect(page.locator('#ip-result')).toContainText('不适用于本地地址');
+  expect(requestCount).toBe(2);
+});
+
+test('IP 查询过程中修改地址会取消请求并恢复按钮', async ({ page }) => {
+  await page.route('https://api.ipquery.io/**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ location: { country: '美国' } }),
+    });
+  });
+  await page.goto('/#/tool/ip');
+  const queryButton = page.locator('[data-tool-action="ip-query"]');
+  await queryButton.click();
+  await expect(queryButton).toBeDisabled();
+
+  await page.locator('#ip-input').fill('192.168.1.1');
+  await expect(queryButton).toBeEnabled();
+  await expect(page.locator('#ip-status')).toHaveText('本地识别完成');
+  await expect(page.locator('#ip-result')).toContainText('不适用于本地地址');
+});
+
+test('Kafka 配置支持 SASL PLAIN 用户名密码', async ({ page }) => {
+  await page.goto('/#/tool/message-queue');
+  const brokerPicker = page.locator('[data-bt-select="mq-broker"]');
+  await brokerPicker.locator('[data-bt-select-toggle]').click();
+  await brokerPicker.locator('[data-bt-select-value="kafka"]').click();
+  await page.locator('#mq-address').fill('kafka.example.test');
+  await page.locator('#mq-username').fill('byetools-user');
+  await page.locator('#mq-password').fill('byetools-password');
+  await page.locator('[data-mq-action="test"]').click();
+  await expect(page.locator('#mq-connection-status')).toContainText('等待桌面端接入');
+  await expect(page.locator('#mq-connection-status')).not.toContainText('暂不支持 SASL');
 });
 
 test('刷新后恢复主题与收藏', async ({ page }) => {

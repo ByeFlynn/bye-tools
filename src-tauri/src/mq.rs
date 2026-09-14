@@ -177,14 +177,17 @@ fn validate(config: &MqConfig) -> AppResult<u16> {
             "填写密码时必须同时填写用户名".to_owned(),
         ));
     }
-    if config.broker == "kafka" && (!config.username.is_empty() || !config.password.is_empty()) {
+    if matches!(config.broker.as_str(), "kafka" | "rocketmq")
+        && !config.username.is_empty()
+        && config.password.is_empty()
+    {
         return Err(AppError::InvalidField(
-            "当前桌面版 Kafka 支持无认证连接与 TLS，暂不支持 SASL 用户名密码认证".to_owned(),
-        ));
-    }
-    if config.broker == "rocketmq" && !config.username.is_empty() && config.password.is_empty() {
-        return Err(AppError::InvalidField(
-            "RocketMQ 使用 AccessKey 时必须同时填写 SecretKey".to_owned(),
+            if config.broker == "kafka" {
+                "Kafka 使用 SASL 用户名时必须同时填写密码"
+            } else {
+                "RocketMQ 使用 AccessKey 时必须同时填写 SecretKey"
+            }
+            .to_owned(),
         ));
     }
     if config.broker == "rocketmq" && config.group.trim().is_empty() {
@@ -1171,5 +1174,27 @@ mod tests {
 
         config.password = "secret-key".to_owned();
         assert!(validate(&config).is_ok());
+    }
+
+    #[test]
+    fn kafka_config_accepts_sasl_plain_credentials() {
+        let mut config = rocketmq_config();
+        config.broker = "kafka".to_owned();
+        config.port = "9092".to_owned();
+        config.topic = "byetools.events".to_owned();
+        config.username = "byetools-user".to_owned();
+        config.password.clear();
+        assert!(validate(&config).is_err());
+
+        config.password = "byetools-password".to_owned();
+        assert!(validate(&config).is_ok());
+        let client = kafka_config(&config, 9092, Some("byetools-consumer"));
+        assert_eq!(client.get("security.protocol"), Some("sasl_plaintext"));
+        assert_eq!(client.get("sasl.mechanisms"), Some("PLAIN"));
+        assert_eq!(client.get("sasl.username"), Some("byetools-user"));
+
+        config.tls = true;
+        let tls_client = kafka_config(&config, 9092, Some("byetools-consumer"));
+        assert_eq!(tls_client.get("security.protocol"), Some("sasl_ssl"));
     }
 }

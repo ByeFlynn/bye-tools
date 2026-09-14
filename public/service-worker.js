@@ -1,4 +1,4 @@
-const CACHE_NAME = 'byetools-20260913-v4';
+const CACHE_NAME = 'byetools-20260914-v5';
 const CORE_FILES = ['./', './index.html'];
 
 self.addEventListener('install', (event) => {
@@ -16,6 +16,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
   const isAppResource = event.request.mode === 'navigate' || /\.(?:js|css)$/.test(requestUrl.pathname);
   if (isAppResource) {
     event.respondWith(
