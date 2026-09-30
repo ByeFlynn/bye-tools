@@ -7815,7 +7815,7 @@ function renderJsonEditor() {
   const currentLine = source.slice(0, input.selectionStart || 0).split('\n').length - 1;
   const lines = source.split('\n');
   numbers.innerHTML = lines.map((line, index) => `<span class="json-line-number ${index === currentLine ? 'is-current' : ''}">${index + 1}</span>`).join('');
-  highlight.innerHTML = lines.map((line, index) => `<span class="json-code-line ${index === currentLine ? 'is-current' : ''}">${highlightJsonLine(line) || ' '}</span>`).join('\n');
+  highlight.innerHTML = lines.map((line, index) => `<span class="json-code-line ${index === currentLine ? 'is-current' : ''}">${highlightJsonLine(line) || ' '}</span>`).join('');
   syncJsonScroll();
 }
 
@@ -7835,7 +7835,7 @@ function highlightJsonLine(line) {
   for (const match of line.matchAll(tokenPattern)) {
     result += escapeHtml(line.slice(cursor, match.index));
     const token = match[0];
-    const type = token.startsWith('"') ? (/\s*:$/.test(line.slice(match.index + token.length)) ? 'key' : 'string') : token === 'true' || token === 'false' ? 'boolean' : token === 'null' ? 'null' : 'number';
+    const type = token.startsWith('"') ? (/^\s*:/.test(line.slice(match.index + token.length)) ? 'key' : 'string') : token === 'true' || token === 'false' ? 'boolean' : token === 'null' ? 'null' : 'number';
     result += `<span class="json-token-${type}">${escapeHtml(token)}</span>`;
     cursor = match.index + token.length;
   }
@@ -8071,6 +8071,23 @@ function copyText(value) {
   return Promise.resolve();
 }
 
+function jsonCopyPayload() {
+  const input = document.querySelector('#json-input');
+  if (input && input.selectionStart !== input.selectionEnd) {
+    return {
+      text: input.value.slice(input.selectionStart, input.selectionEnd),
+      message: '已复制输入区选中文本',
+    };
+  }
+  const path = state.json.selectedPath || [];
+  const value = getValueAtPath(state.json.value, path);
+  const displayedValue = typeof value === 'string' && state.json.autoDecode ? decodeAutoString(value) : value;
+  return {
+    text: typeof displayedValue === 'string' ? displayedValue : JSON.stringify(displayedValue, null, 2),
+    message: path.length ? '已复制选中节点' : '已复制 JSON 结果',
+  };
+}
+
 function downloadJson() {
   if (!state.json.valid) { showToast('请先输入有效 JSON'); return; }
   const blob = new Blob([JSON.stringify(sortJsonValue(state.json.value, state.json.sort), null, 2)], { type: 'application/json;charset=utf-8' });
@@ -8132,8 +8149,8 @@ function handleJsonAction(target) {
     setJsonOutputView('collapse');
   } else if (action === 'copy') {
     if (!state.json.valid) { showToast('请先输入有效 JSON'); return true; }
-    const value = state.json.extracted?.value ?? getValueAtPath(state.json.value, state.json.selectedPath);
-    copyText(JSON.stringify(value, null, 2)).then(() => showToast(state.json.selectedPath.length ? '已复制选中节点' : '已复制 JSON 结果'));
+    const payload = jsonCopyPayload();
+    copyText(payload.text).then(() => showToast(payload.message));
   } else if (action === 'download') {
     downloadJson();
   } else if (action === 'extract') {

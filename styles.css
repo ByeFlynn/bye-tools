@@ -1195,7 +1195,7 @@ body {
 }
 
 .json-workbench { display: grid; gap: 10px; min-width: 0; }
-.json-toolbar { display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 7px 9px; overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .08); scrollbar-width: thin; }
+.json-toolbar { position: sticky; z-index: 9; top: calc(var(--topbar-height) + 8px); display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 7px 9px; overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .08); scrollbar-width: thin; }
 .json-toolbar-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--bg-soft) 62%, transparent); flex: 0 0 auto; }
 .json-toolbar-main { background: color-mix(in srgb, var(--brand-soft) 45%, var(--bg-soft)); }
 .json-command, .json-sort-control { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 13px; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 13px; font-weight: 650; white-space: nowrap; }
@@ -1222,7 +1222,7 @@ body {
 .json-status-meta { color: var(--text-muted); }
 .json-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 0; }
 .json-layout.is-stack { grid-template-columns: 1fr; }
-.json-pane { display: flex; min-width: 0; min-height: 610px; flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); box-shadow: 0 12px 28px rgba(0, 0, 0, .08); }
+.json-pane { display: flex; min-width: 0; height: min(720px, calc(100vh - var(--topbar-height) - 96px)); min-height: 520px; flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); box-shadow: 0 12px 28px rgba(0, 0, 0, .08); }
 .json-pane-head { display: flex; min-height: 55px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 15px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--panel-strong) 72%, transparent); }
 .json-pane-head > div:first-child { display: grid; gap: 3px; min-width: 0; }
 .json-pane-head strong { font-size: 15px; letter-spacing: -.02em; }
@@ -1343,7 +1343,7 @@ body {
   .json-encoding-group { margin-left: 0; }
   .json-status-strip { flex-wrap: wrap; padding-block: 5px; }
   .json-layout, .json-layout.is-stack { grid-template-columns: 1fr; }
-  .json-pane { min-height: 500px; }
+  .json-pane { height: min(620px, calc(100vh - var(--topbar-height) - 48px)); min-height: 500px; }
   .json-editor-shell { min-height: 420px; }
   .json-highlight, .json-input { min-height: 420px; }
   .json-result-head { align-items: flex-start; flex-direction: column; padding-block: 10px; }

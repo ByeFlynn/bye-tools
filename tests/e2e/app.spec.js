@@ -400,6 +400,78 @@ test('JSON 工作台支持格式化和视图切换', async ({ page }) => {
   await expect(page.locator('.json-metadata-grid')).toBeVisible();
 });
 
+test('JSON 工作台复制输入选区和当前树节点的实际值', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:4173' });
+  await page.goto('/#/tool/json');
+  const input = page.locator('#json-input');
+  await input.fill('{"previous":"旧值","selected":"需要复制的值","encoded":"hello%20world"}');
+  await page.getByRole('button', { name: '格式化', exact: true }).click();
+
+  await page.locator('.json-tree-value').filter({ hasText: '旧值' }).click();
+  await page.getByRole('button', { name: '提取', exact: true }).click();
+  await page.locator('.json-tree-value').filter({ hasText: '需要复制的值' }).click();
+  await page.getByRole('button', { name: '复制', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('需要复制的值');
+
+  await page.locator('.json-tree-value').filter({ hasText: 'hello world' }).click();
+  await page.getByRole('button', { name: '复制', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('hello world');
+
+  const formatted = await input.inputValue();
+  const selectionStart = formatted.indexOf('selected');
+  await input.evaluate((node, start) => {
+    node.focus();
+    node.setSelectionRange(start, start + 'selected'.length);
+  }, selectionStart);
+  await page.getByRole('button', { name: '复制', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('selected');
+});
+
+test('JSON 编辑器鼠标拖选的可见文本与剪贴板内容一致', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:4173' });
+  await page.goto('/#/tool/json');
+  await page.locator('#json-input').fill(JSON.stringify({ orderCha: 'A', orderType: 'B', userLevel: '1004', userType: '2', isStaff: 'true' }));
+  await page.getByRole('button', { name: '格式化', exact: true }).click();
+
+  const keyToken = page.locator('#json-highlight .json-token-key').filter({ hasText: '"userType"' });
+  const box = await keyToken.boundingBox();
+  expect(box).not.toBeNull();
+  const characterWidth = box.width / '"userType"'.length;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + characterWidth * 1.1, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + characterWidth * 9, y, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.press('Control+C');
+
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('userType');
+});
+
+test('JSON 长内容滚动时工具栏保持可见且结果区内部滚动', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/#/tool/json');
+  const largeValue = Object.fromEntries(Array.from({ length: 180 }, (_, index) => [`field_${index}`, `value_${index}`]));
+  await page.locator('#json-input').fill(JSON.stringify(largeValue));
+  await page.getByRole('button', { name: '格式化', exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+
+  const layout = await page.evaluate(() => {
+    const topbar = document.querySelector('.topbar').getBoundingClientRect();
+    const toolbar = document.querySelector('.json-toolbar').getBoundingClientRect();
+    const result = document.querySelector('#json-result-body');
+    return {
+      topbarBottom: topbar.bottom,
+      toolbarTop: toolbar.top,
+      toolbarBottom: toolbar.bottom,
+      resultClientHeight: result.clientHeight,
+      resultScrollHeight: result.scrollHeight,
+    };
+  });
+  expect(layout.toolbarTop).toBeGreaterThanOrEqual(layout.topbarBottom);
+  expect(layout.toolbarBottom).toBeLessThan(900);
+  expect(layout.resultScrollHeight).toBeGreaterThan(layout.resultClientHeight);
+});
+
 test('格式化工具支持 XML 格式化、转换和 SQL 整理', async ({ page }) => {
   await page.goto('/#/tool/xml-format');
   await expect(page.getByRole('heading', { name: 'XML 格式化' })).toBeVisible();
