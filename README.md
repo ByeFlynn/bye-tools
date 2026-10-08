@@ -20,6 +20,8 @@ npm run dev
 
 完整工具清单、功能说明、扩展能力和验收要求见：[ByeTools-最终详细方案.md](../方案/ByeTools-最终详细方案.md)。
 
+面向使用者的当前功能、操作方法、运行边界和页面截图见：[ByeTools 功能说明文档](./docs/ByeTools-功能说明文档.md)。
+
 ## 验证
 
 ```bash

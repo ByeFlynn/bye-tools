@@ -14,7 +14,8 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "test:visual": "node tests/visual/capture.mjs"
+    "test:visual": "node tests/visual/capture.mjs",
+    "docs:screenshots": "node scripts/capture-docs.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
